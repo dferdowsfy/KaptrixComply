@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { PREVIEW_TABS } from "@/lib/preview-tabs";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { ConnectionStatus } from "@/components/preview/connection-status";
 
 export function PreviewShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -23,8 +24,8 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
               Operator Workspace
             </h1>
           </div>
-          <div className="inline-flex self-start rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 sm:self-auto sm:px-4 sm:py-2 sm:text-sm">
-            Supabase + Gemini live
+          <div className="inline-flex self-start sm:self-auto">
+            <ConnectionStatus />
           </div>
         </div>
       </div>
