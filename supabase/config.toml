@@ -1,6 +1,4 @@
-[project]
-id = "kaptrix-platform"
-name = "Kaptrix Delivery Platform"
+project_id = "kaptrix-platform"
 
 [api]
 enabled = true
