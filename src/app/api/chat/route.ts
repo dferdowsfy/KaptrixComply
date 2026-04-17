@@ -24,7 +24,7 @@ Rules:
 - Be concise and structured. Prefer short paragraphs or simple bullet lists when helpful.
 - Cite specific documents, claims, red flags, scorecard dimensions, or report sections when relevant.
 - Never fabricate metrics, vendor names, clients, or regulations. Never expose chain-of-thought.
-- Respond in plain text. No markdown headings or code fences.`;
+- Respond in plain text only. Never use markdown formatting: no bold (**), no italics (*), no headings (#), no code fences, no bullet markers.`;
 
 function buildContextFromSnapshot(
   snapshot: Awaited<ReturnType<typeof getPreviewSnapshot>>,

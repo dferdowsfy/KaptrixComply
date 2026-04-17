@@ -26,39 +26,23 @@ export function ConnectionStatus() {
 
   if (!status) {
     return (
-      <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-500 sm:px-4 sm:py-2 sm:text-sm">
-        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-slate-400" />
-        Checking connections…
-      </div>
+      <span
+        className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-slate-400"
+        title="Checking connections…"
+      />
     );
   }
 
   const allGood = status.supabase && status.gemini;
 
   return (
-    <div
-      className={`inline-flex items-center gap-3 rounded-full border px-3 py-1.5 text-xs font-medium sm:px-4 sm:py-2 sm:text-sm ${
+    <span
+      className={`inline-block h-2.5 w-2.5 rounded-full ${
         allGood
-          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-          : "border-amber-200 bg-amber-50 text-amber-800"
+          ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]"
+          : "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"
       }`}
-    >
-      <span className="flex items-center gap-1.5">
-        <span
-          className={`inline-block h-2 w-2 rounded-full ${
-            status.supabase ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]" : "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"
-          }`}
-        />
-        Supabase
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span
-          className={`inline-block h-2 w-2 rounded-full ${
-            status.gemini ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]" : "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"
-          }`}
-        />
-        Gemini
-      </span>
-    </div>
+      title={allGood ? "Online" : "Offline"}
+    />
   );
 }

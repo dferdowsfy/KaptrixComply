@@ -45,21 +45,8 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const pathname = request.nextUrl.pathname;
-
-  if (isPublicPath(pathname)) {
-    return supabaseResponse;
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
+  // Refresh session cookie if present, but never redirect to login.
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }

@@ -270,7 +270,7 @@ export function FloatingKnowledgeChatbot() {
                       : "border border-slate-200 bg-slate-50 text-slate-800"
                   }`}
                 >
-                  {m.text}
+                  {m.text.replace(/\*\*/g, '')}
                 </div>
                 {m.citations && m.citations.length > 0 && (
                   <p className="mt-1 text-[11px] text-slate-500">
