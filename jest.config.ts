@@ -7,7 +7,7 @@ const config: Config = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
-  setupFilesAfterSetup: ["<rootDir>/tests/setup.ts"],
+    setupFilesAfterEnv: ["<rootDir>/tests/setup.ts"],
   collectCoverageFrom: [
     "src/lib/**/*.ts",
     "!src/lib/supabase/**",

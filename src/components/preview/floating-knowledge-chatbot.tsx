@@ -127,7 +127,7 @@ export function FloatingKnowledgeChatbot() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <div className="print-hide fixed bottom-5 right-5 z-50">
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}

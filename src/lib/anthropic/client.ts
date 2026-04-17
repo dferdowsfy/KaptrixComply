@@ -1,17 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-  defaultHeaders: {
-    // Zero data retention — Anthropic does not store or train on this data
-    "anthropic-beta": "zdr-2024-07-01",
-  },
-});
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
 
-export { anthropic };
+export { genAI };
 
 export const MODELS = {
-  PRE_ANALYSIS: "claude-sonnet-4-20250514",
-  SYNTHESIS: "claude-opus-4-20250514",
-  RED_FLAG_DETECTION: "claude-opus-4-20250514",
+  PRE_ANALYSIS: "gemini-3.1-flash-lite-preview",
+  SYNTHESIS: "gemini-3.1-flash-lite-preview",
+  RED_FLAG_DETECTION: "gemini-3.1-flash-lite-preview",
 } as const;

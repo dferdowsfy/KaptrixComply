@@ -8,7 +8,7 @@ export function useAutosave<T>(
   intervalMs = 10000,
 ) {
   const lastSaved = useRef<string>("");
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
+    const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const save = useCallback(async () => {
     const serialized = JSON.stringify(data);

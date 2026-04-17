@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logAuditEvent } from "@/lib/audit/logger";
 
 // Pre-analysis API — triggers AI pre-analysis for an engagement
-// Phase 1: plumbing only — Anthropic API calls will be wired in Module 2
+// Phase 1: plumbing only — Google Gemini API calls will be wired in Module 2
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   const version = promptVersion?.version ?? "1.0.0";
-  const model = promptVersion?.model ?? "claude-sonnet-4-20250514";
+  const model = promptVersion?.model ?? "gemini-3.1-flash-lite-preview";
 
   // Create pre-analysis records for each document (status: running)
   const analysisRecords = documents.map((doc) => ({
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // TODO: Trigger actual Anthropic API calls here (Module 2)
+  // TODO: Trigger actual Google Gemini API calls here (Module 2)
   // For now, the records are created with status "running"
 
   return NextResponse.json(

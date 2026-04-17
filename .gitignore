@@ -35,6 +35,9 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# local tool caches
+.playwright-mcp/
+
 # vercel
 .vercel
 

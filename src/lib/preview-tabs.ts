@@ -1,4 +1,5 @@
 export const PREVIEW_TABS = [
+  { id: "home", label: "Home", href: "/preview" },
   { id: "overview", label: "Overview", href: "/preview/overview" },
   { id: "intake", label: "Intake", href: "/preview/intake" },
   { id: "coverage", label: "Coverage", href: "/preview/coverage" },
