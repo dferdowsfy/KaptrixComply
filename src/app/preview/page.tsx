@@ -1,14 +1,65 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SectionHeader } from "@/components/preview/preview-shell";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import type { PreviewClientSummary } from "@/lib/preview-clients";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import type { Engagement } from "@/lib/types";
+
+/** Map a Supabase Engagement row into the shape the client card expects. */
+function engagementToClient(e: Engagement): PreviewClientSummary {
+  return {
+    id: e.id,
+    target: e.target_company_name,
+    client: e.client_firm_name,
+    industry: "",
+    deal_stage: e.deal_stage,
+    status: e.status,
+    tier: e.tier === "signal_scan" ? "essentials" : e.tier === "deep" ? "premium" : "standard",
+    composite_score: null,
+    recommendation: e.status === "delivered" ? "Delivered" : e.status === "intake" ? "In intake" : "In progress",
+    fee_usd: e.engagement_fee ?? 0,
+    deadline: e.delivery_deadline ?? "",
+    summary: "",
+  };
+}
 
 export default function PreviewHomePage() {
   const { allClients, selectedId, setSelectedId } = useSelectedPreviewClient();
   const router = useRouter();
+  const [showForm, setShowForm] = useState(false);
+
+  // Supabase engagements
+  const [engagements, setEngagements] = useState<Engagement[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadEngagements = useCallback(async () => {
+    try {
+      const res = await fetch("/api/preview/engagements", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setEngagements(data.engagements ?? []);
+      }
+    } catch {
+      // fall back to preview clients
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadEngagements();
+  }, [loadEngagements]);
+
+  // Merge: real engagements first, then preview mock clients (if any) that aren't in Supabase
+  const engagementIds = new Set(engagements.map((e) => e.id));
+  const supabaseClients = engagements.map(engagementToClient);
+  const mergedClients = [
+    ...supabaseClients,
+    ...allClients.filter((c) => !engagementIds.has(c.id)),
+  ];
 
   const openClient = (id: string) => {
     setSelectedId(id);
@@ -17,23 +68,219 @@ export default function PreviewHomePage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <SectionHeader
-        eyebrow="Home"
-        title="Your active client roster"
-        description="Choose an engagement to dive into its intake, coverage, insights, pre-analysis, scoring, and executive report. The selected client stays pinned in the header across every tab."
-      />
-
-      <div className="grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-2">
-        {allClients.map((c) => (
-          <ClientCard
-            key={c.id}
-            client={c}
-            isSelected={c.id === selectedId}
-            onOpen={() => openClient(c.id)}
-          />
-        ))}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <SectionHeader
+          eyebrow="Home"
+          title="Your active client roster"
+          description="Choose an engagement to dive into its workspace, or add a new client below."
+        />
+        <button
+          type="button"
+          onClick={() => setShowForm(!showForm)}
+          className="shrink-0 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+        >
+          {showForm ? "Cancel" : "+ New Client"}
+        </button>
       </div>
+
+      {showForm && (
+        <NewClientForm
+          onCreated={() => {
+            setShowForm(false);
+            loadEngagements();
+          }}
+        />
+      )}
+
+      {loading ? (
+        <div className="py-12 text-center text-sm text-slate-500">Loading engagements…</div>
+      ) : mergedClients.length === 0 ? (
+        <div className="rounded-2xl border-2 border-dashed border-slate-300 py-16 text-center">
+          <p className="text-sm text-slate-500">No engagements yet. Add your first client above.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-2">
+          {mergedClients.map((c) => (
+            <ClientCard
+              key={c.id}
+              client={c}
+              isSelected={c.id === selectedId}
+              onOpen={() => openClient(c.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+/* ──────── New Client Form ──────── */
+
+function NewClientForm({ onCreated }: { onCreated: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    target_company_name: "",
+    client_firm_name: "",
+    deal_stage: "preliminary",
+    tier: "standard",
+    engagement_fee: "",
+    delivery_deadline: "",
+    client_contact_email: "",
+    referral_source: "",
+  });
+
+  function update(key: string, value: string) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/preview/engagements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          engagement_fee: form.engagement_fee ? Number(form.engagement_fee) : null,
+          delivery_deadline: form.delivery_deadline || null,
+          client_contact_email: form.client_contact_email || null,
+          referral_source: form.referral_source || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+
+      onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create engagement");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+    >
+      <h3 className="text-lg font-bold text-slate-900">Add New Client</h3>
+
+      {error && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Target Company *</label>
+          <input
+            type="text"
+            required
+            value={form.target_company_name}
+            onChange={(e) => update("target_company_name", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="NovaMind AI"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Client Firm *</label>
+          <input
+            type="text"
+            required
+            value={form.client_firm_name}
+            onChange={(e) => update("client_firm_name", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="Acme Capital Partners"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Deal Stage</label>
+          <select
+            value={form.deal_stage}
+            onChange={(e) => update("deal_stage", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option value="preliminary">Preliminary</option>
+            <option value="loi">LOI</option>
+            <option value="confirmatory">Confirmatory</option>
+            <option value="post_close">Post-Close</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Engagement Tier</label>
+          <select
+            value={form.tier}
+            onChange={(e) => update("tier", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option value="signal_scan">Signal Scan ($2,500)</option>
+            <option value="standard">Standard ($12,500)</option>
+            <option value="deep">Deep Diligence ($35,000)</option>
+            <option value="retained">Retained ($120,000/yr)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Fee ($)</label>
+          <input
+            type="number"
+            value={form.engagement_fee}
+            onChange={(e) => update("engagement_fee", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="12500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Delivery Deadline</label>
+          <input
+            type="date"
+            value={form.delivery_deadline}
+            onChange={(e) => update("delivery_deadline", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Client Email</label>
+          <input
+            type="email"
+            value={form.client_contact_email}
+            onChange={(e) => update("client_contact_email", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="partner@firm.com"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Referral Source</label>
+          <select
+            value={form.referral_source}
+            onChange={(e) => update("referral_source", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option value="">Select…</option>
+            <option value="direct">Direct</option>
+            <option value="referral">Referral</option>
+            <option value="signal_hunter">Signal Hunter</option>
+            <option value="platform">Platform</option>
+            <option value="content">Content</option>
+          </select>
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={saving}
+        className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50"
+      >
+        {saving ? "Creating…" : "Create Engagement"}
+      </button>
+    </form>
   );
 }
 
