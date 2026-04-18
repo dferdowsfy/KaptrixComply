@@ -176,13 +176,57 @@ Answer:`;
   });
 
   try {
-    const completion = await getGroqClient().chat.completions.create({
-      model: MODELS.PRE_ANALYSIS,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 1024,
-      temperature: 0.3,
-    });
+    const groq = getGroqClient();
+
+    // Run answer + follow-up suggestion generation in parallel
+    const [completion, suggestionsResp] = await Promise.all([
+      groq.chat.completions.create({
+        model: MODELS.PRE_ANALYSIS,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 1024,
+        temperature: 0.3,
+      }),
+      groq.chat.completions
+        .create({
+          model: MODELS.PRE_ANALYSIS,
+          messages: [
+            {
+              role: "user",
+              content: `You are generating follow-up question suggestions for a diligence chat. Based on the user's question and the available evidence, return exactly 3 short, specific follow-up questions a diligence analyst might ask next. Keep each under 8 words. Return JSON only: {"suggestions":["q1","q2","q3"]}.
+
+EVIDENCE SNIPPET:
+${context.slice(0, 6000)}
+
+USER JUST ASKED: ${question}
+
+JSON:`,
+            },
+          ],
+          max_tokens: 200,
+          temperature: 0.7,
+          response_format: { type: "json_object" },
+        })
+        .catch(() => null),
+    ]);
+
     const answer = (completion.choices[0]?.message?.content ?? "").trim();
+
+    let suggestions: string[] = [];
+    if (suggestionsResp) {
+      try {
+        const raw = suggestionsResp.choices[0]?.message?.content ?? "{}";
+        const parsed = JSON.parse(raw) as { suggestions?: unknown };
+        if (Array.isArray(parsed.suggestions)) {
+          suggestions = parsed.suggestions
+            .filter((s): s is string => typeof s === "string")
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .slice(0, 4);
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     await persistTurn({
       session_id: sessionId,
@@ -192,7 +236,7 @@ Answer:`;
       metadata: { model: MODELS.PRE_ANALYSIS },
     });
 
-    return NextResponse.json({ answer });
+    return NextResponse.json({ answer, suggestions });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     await persistTurn({

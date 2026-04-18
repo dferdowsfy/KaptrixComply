@@ -65,6 +65,7 @@ export function FloatingKnowledgeChatbot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>(STARTER_PROMPTS);
   const sessionId = useMemo(getSessionId, []);
 
   const kb = useSyncExternalStore(
@@ -82,6 +83,11 @@ export function FloatingKnowledgeChatbot() {
       },
     ]);
   }, [client.target, selectedId]);
+
+  // Reset contextual suggestions to defaults whenever client changes
+  useEffect(() => {
+    setSuggestions(STARTER_PROMPTS);
+  }, [selectedId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -220,8 +226,14 @@ export function FloatingKnowledgeChatbot() {
         }),
       });
       if (res.ok) {
-        const data = (await res.json()) as { answer?: string };
+        const data = (await res.json()) as {
+          answer?: string;
+          suggestions?: string[];
+        };
         answerText = (data.answer ?? "").trim();
+        if (Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+          setSuggestions(data.suggestions.slice(0, 4));
+        }
       } else {
         const data = (await res.json().catch(() => ({}))) as {
           error?: string;
@@ -398,19 +410,23 @@ export function FloatingKnowledgeChatbot() {
 
           {/* Input */}
           <div className="border-t border-slate-700/60 bg-slate-900/80 p-4 backdrop-blur">
-            <div className="mb-3 flex flex-wrap gap-2">
-              {STARTER_PROMPTS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  disabled={pending}
-                  onClick={() => ask(s)}
-                  className="rounded-full border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs text-slate-300 transition hover:border-indigo-400 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+            {suggestions.length > 0 && (
+              <div className="-mx-4 mb-3 overflow-hidden">
+                <div className="flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled={pending}
+                      onClick={() => ask(s)}
+                      className="flex-shrink-0 whitespace-nowrap rounded-full border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs text-slate-300 transition hover:border-indigo-400 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
