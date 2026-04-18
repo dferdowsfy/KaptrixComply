@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import {
   KNOWLEDGE_STEP_LABELS,
   type KnowledgeEntry,
@@ -22,6 +22,33 @@ const STEP_ORDER: KnowledgeStep[] = [
 
 const RECENT_WINDOW_MS = 6000;
 
+// Shared ticking store so React stays pure: time advances via an
+// external subscription rather than setState inside an effect.
+const tickListeners = new Set<() => void>();
+let tickValue = typeof window === "undefined" ? 0 : Date.now();
+let tickTimer: ReturnType<typeof setInterval> | null = null;
+
+function subscribeTick(cb: () => void): () => void {
+  tickListeners.add(cb);
+  if (tickTimer === null && typeof window !== "undefined") {
+    tickTimer = setInterval(() => {
+      tickValue = Date.now();
+      tickListeners.forEach((fn) => fn());
+    }, 1000);
+  }
+  return () => {
+    tickListeners.delete(cb);
+    if (tickListeners.size === 0 && tickTimer !== null) {
+      clearInterval(tickTimer);
+      tickTimer = null;
+    }
+  };
+}
+
+function getTick(): number {
+  return tickValue;
+}
+
 export function KbActivityIndicator() {
   const { client, ready } = useSelectedPreviewClient();
   const clientId = ready ? client.id : null;
@@ -32,14 +59,10 @@ export function KbActivityIndicator() {
     () => readClientKb(null),
   );
 
-  // Re-render every second so "recent" pulse decays without manual updates.
-  const [, force] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => force((n) => n + 1), 1000);
-    return () => window.clearInterval(id);
-  }, []);
+  // Subscribe to a 1s tick that exposes Date.now() as its snapshot,
+  // keeping render pure.
+  const now = useSyncExternalStore(subscribeTick, getTick, () => 0);
 
-  const now = Date.now();
   const syncedCount = STEP_ORDER.filter((s) => kb[s]).length;
 
   return (
