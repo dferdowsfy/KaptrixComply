@@ -189,6 +189,106 @@ export interface PromptVersion {
 }
 
 // ============================================
+// Adjustment proposals (evidence layer)
+// ============================================
+
+export type AdjustmentSourceKind =
+  | 'artifact'
+  | 'pre_analysis'
+  | 'intake'
+  | 'coverage'
+  | 'benchmark';
+
+export type AdjustmentStatus =
+  | 'proposed'
+  | 'approved'
+  | 'rejected'
+  | 'superseded';
+
+/**
+ * Server-authoritative adjustment proposal. Evidence — not the operator —
+ * generates these. They DO NOT modify the score until status='approved' and
+ * are explicitly applied. Bounds are enforced at the DB level (see
+ * supabase/migrations/00016_create_adjustment_proposals.sql).
+ */
+export interface AdjustmentProposal {
+  id: string;
+  engagement_id: string;
+  dimension: ScoreDimension;
+  sub_criterion: string;
+  proposed_delta: number;             // [-0.5, +0.5] enforced at DB
+  rationale: string;                  // ≥20 chars enforced at DB
+  source_kind: AdjustmentSourceKind;
+  source_id: string | null;           // document_id / pre_analysis_id / etc.
+  evidence_locator: string | null;    // 'p.7' / 'slide 12' / '§4.2'
+  classifier: string | null;          // 'architecture' | 'policy' | ...
+  confidence: number;                 // [0, 1]
+  status: AdjustmentStatus;
+  decided_by: string | null;
+  decided_at: string | null;
+  created_at: string;
+}
+
+export interface CreateAdjustmentProposalInput {
+  engagement_id: string;
+  dimension: ScoreDimension;
+  sub_criterion: string;
+  proposed_delta: number;
+  rationale: string;
+  source_kind: AdjustmentSourceKind;
+  source_id?: string;
+  evidence_locator?: string;
+  classifier?: string;
+  confidence: number;
+}
+
+export interface DecideAdjustmentInput {
+  decision: 'approve' | 'reject';
+  note?: string;
+}
+
+// ============================================
+// Score history (append-only audit)
+// ============================================
+
+export type ScoreChangeSource =
+  | 'operator'
+  | 'adjustment_approved'
+  | 'adjustment_reverted';
+
+export interface ScoreHistoryEntry {
+  id: string;
+  score_id: string;
+  engagement_id: string;
+  dimension: ScoreDimension;
+  sub_criterion: string;
+  prior_value: number | null;
+  new_value: number;
+  delta: number;
+  change_source: ScoreChangeSource;
+  adjustment_proposal_id: string | null;
+  prior_rationale: string | null;
+  new_rationale: string | null;
+  changed_by: string;
+  changed_at: string;
+}
+
+// ============================================
+// Evidence confidence (separate from score)
+// ============================================
+
+export interface EvidenceConfidence {
+  engagement_id: string;
+  coverage_completeness: number;  // [0, 1]
+  source_quality: number;         // [0, 1]
+  recency: number;                // [0, 1]
+  consistency: number;            // [0, 1]
+  composite: number;              // [0, 1]
+  inputs_hash: string;
+  computed_at: string;
+}
+
+// ============================================
 // Nested / structured types
 // ============================================
 

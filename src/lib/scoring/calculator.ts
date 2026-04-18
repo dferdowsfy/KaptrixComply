@@ -1,5 +1,12 @@
 import { SCORING_DIMENSIONS } from "@/lib/constants";
+import {
+  DIMENSION_MAX_ABS_DELTA,
+  applyApprovedAdjustments,
+  groupApprovedBySub,
+  subKey,
+} from "@/lib/scoring/adjustments";
 import type {
+  AdjustmentProposal,
   DealStage,
   EngagementStatus,
   PreAnalysis,
@@ -66,6 +73,87 @@ export function isFullyScored(scores: Score[]): boolean {
       ),
     ),
   );
+}
+
+/* ============================================================
+ * Final score = base + approved adjustments (server-authoritative)
+ * ============================================================
+ * Deterministic. Reads only operator-set base scores and approved
+ * AdjustmentProposal rows. Confidence is reported alongside but
+ * NEVER folded into the composite.
+ */
+
+export interface FinalCompositeResult extends CompositeResult {
+  base_composite: number;
+  adjustment_composite_delta: number;
+  per_dimension_adjustment: Record<ScoreDimension, number>;
+  /** 0..1, separate axis. Does not modify the score. */
+  evidence_confidence: number;
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
+export function calculateFinalScore(
+  baseScores: Score[],
+  approvedAdjustments: AdjustmentProposal[],
+  evidenceConfidence: number = 0,
+): FinalCompositeResult {
+  const base = calculateCompositeScore(baseScores);
+  const bySub = groupApprovedBySub(approvedAdjustments);
+
+  const dimensionDetails = SCORING_DIMENSIONS.map((dim) => {
+    const subs = baseScores.filter((s) => s.dimension === dim.key);
+    const adjustedSubs = subs.map((s) => {
+      const props = bySub.get(subKey(dim.key, s.sub_criterion)) ?? [];
+      const finalSub = applyApprovedAdjustments(
+        s.score_0_to_5,
+        props,
+        DIMENSION_MAX_ABS_DELTA,
+      );
+      return { sub_criterion: s.sub_criterion, score: round1(finalSub) };
+    });
+
+    const average =
+      adjustedSubs.length > 0
+        ? adjustedSubs.reduce((sum, s) => sum + s.score, 0) /
+          adjustedSubs.length
+        : 0;
+
+    return {
+      dimension: dim.key,
+      name: dim.name,
+      weight: dim.weight,
+      average_score: round1(average),
+      sub_scores: adjustedSubs,
+    };
+  });
+
+  const dimension_scores = Object.fromEntries(
+    dimensionDetails.map((d) => [d.dimension, d.average_score]),
+  ) as Record<ScoreDimension, number>;
+
+  const composite_score = round1(
+    dimensionDetails.reduce((sum, d) => sum + d.average_score * d.weight, 0),
+  );
+
+  const per_dimension_adjustment = Object.fromEntries(
+    dimensionDetails.map((d) => [
+      d.dimension,
+      round1(d.average_score - (base.dimension_scores[d.dimension] ?? 0)),
+    ]),
+  ) as Record<ScoreDimension, number>;
+
+  return {
+    composite_score,
+    base_composite: base.composite_score,
+    adjustment_composite_delta: round1(composite_score - base.composite_score),
+    per_dimension_adjustment,
+    dimension_scores,
+    dimension_details: dimensionDetails,
+    evidence_confidence: Math.max(0, Math.min(1, evidenceConfidence)),
+  };
 }
 
 /* ============================================================

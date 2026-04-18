@@ -13,15 +13,21 @@ import { SCORING_DIMENSIONS } from "@/lib/constants";
 // ------------------------------------------------------------------
 // Context signals derived from the knowledge base.
 //
-// A "signal" is a signed delta applied to one scoring dimension with
-// a human-readable reason and a pointer back to the step that
-// produced it. Signals are aggregated, clamped per-dimension, and
-// combined with the operator's explicit sub-criterion scores to
-// produce the context-aware composite.
+// ⚠️  PREVIEW / NON-AUTHORITATIVE.
 //
-// These are demonstration rules, intentionally simple and auditable.
-// Proprietary weighting logic lives server-side and is not exposed
-// to the marketing surface.
+// This module powers the marketing-surface preview only. It computes
+// dimension deltas client-side from a localStorage-backed knowledge
+// base and is therefore not deterministic across clients and not
+// auditable.
+//
+// The PRODUCTION scoring path uses:
+//   - src/lib/scoring/adjustments.ts  (bounds, apply rules)
+//   - /api/adjustments               (operator-approved proposals)
+//   - /api/scores/final              (server-authoritative composite)
+//   - /api/confidence                (separate confidence layer)
+//
+// Do NOT introduce new callers of `deriveContextSignals` /
+// `aggregateContextAdjustment` outside the preview surface.
 // ------------------------------------------------------------------
 
 export interface ContextSignal {

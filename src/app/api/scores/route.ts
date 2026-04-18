@@ -61,6 +61,15 @@ export async function PUT(request: NextRequest) {
     );
   }
 
+  // Read prior value first so we can write a before/after history row.
+  const { data: prior } = await supabase
+    .from("scores")
+    .select("score_0_to_5, operator_rationale")
+    .eq("engagement_id", engagement_id)
+    .eq("dimension", dimension)
+    .eq("sub_criterion", sub_criterion)
+    .maybeSingle();
+
   // Upsert the score
   const { data, error } = await supabase
     .from("scores")
@@ -81,12 +90,45 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const priorValue = prior?.score_0_to_5 ?? null;
+  const newValue = scoreData.score_0_to_5;
+  const delta = priorValue === null ? 0 : Math.round((newValue - priorValue) * 100) / 100;
+
+  // Append-only history. Failures here are logged but do not fail the write —
+  // the audit_log entry below is the authoritative trail.
+  const { error: historyError } = await supabase.from("score_history").insert({
+    score_id: data.id,
+    engagement_id,
+    dimension,
+    sub_criterion,
+    prior_value: priorValue,
+    new_value: newValue,
+    delta,
+    change_source: "operator",
+    adjustment_proposal_id: null,
+    prior_rationale: prior?.operator_rationale ?? null,
+    new_rationale: scoreData.operator_rationale,
+    changed_by: user.id,
+  });
+  if (historyError) {
+    console.error("score_history insert failed", historyError);
+  }
+
   await logAuditEvent({
-    action: "score",
+    action: "score.upsert",
     entity: "score",
     entity_id: data.id,
     engagement_id,
-    metadata: { dimension, sub_criterion, score: scoreData.score_0_to_5 },
+    metadata: {
+      dimension,
+      sub_criterion,
+      prior_score: priorValue,
+      new_score: newValue,
+      delta,
+      source: "operator",
+      evidence_citations:
+        scoreData.evidence_citations?.map((e) => e.document_id) ?? [],
+    },
   });
 
   return NextResponse.json(data);
