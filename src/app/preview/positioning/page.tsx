@@ -6,6 +6,7 @@ import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import {
   formatKnowledgeBaseEvidence,
   readClientKb,
+  submitPositioningToKnowledgeBase,
   subscribeKnowledgeBase,
   type KnowledgeEntry,
   type KnowledgeStep,
@@ -107,6 +108,13 @@ export default function PositioningPage() {
       } else {
         setData(json.positioning);
         setSources(json.sources ?? []);
+        if (selectedId) {
+          submitPositioningToKnowledgeBase({
+            clientId: selectedId,
+            positioning: json.positioning,
+            sources: json.sources ?? [],
+          });
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");

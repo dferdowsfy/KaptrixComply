@@ -5,10 +5,12 @@ import type { ScoreDimension } from "@/lib/types";
 // ------------------------------------------------------------------
 // Client-side per-client "knowledge base" for the preview experience.
 //
-// Each workflow step (intake, coverage, insights, pre-analysis) can
-// "submit" a structured snapshot into this KB. Downstream steps —
-// notably scoring — read from the KB to factor earlier context into
-// the composite score and investment recommendation.
+// Workflow steps and runtime artifacts are captured into this KB.
+// This includes structured submissions (intake/coverage/insights/
+// pre-analysis), generated positioning outputs, and chat turns.
+// Downstream steps read the KB so the assistant can answer with all
+// gathered data without requiring manual "add to knowledge base"
+// actions.
 //
 // Storage is localStorage only (preview mode). A production build
 // would persist this to Supabase under a per-engagement knowledge
@@ -22,13 +24,17 @@ export type KnowledgeStep =
   | "intake"
   | "coverage"
   | "insights"
-  | "pre_analysis";
+  | "pre_analysis"
+  | "positioning"
+  | "chat";
 
 export const KNOWLEDGE_STEP_LABELS: Record<KnowledgeStep, string> = {
   intake: "Intake",
   coverage: "Coverage",
   insights: "Insights",
   pre_analysis: "Pre-analysis",
+  positioning: "Positioning",
+  chat: "Chat",
 };
 
 /** A single submitted snapshot for one workflow step. */
@@ -46,7 +52,9 @@ export type KnowledgePayload =
   | IntakePayload
   | CoveragePayload
   | InsightsPayload
-  | PreAnalysisPayload;
+  | PreAnalysisPayload
+  | PositioningPayload
+  | ChatPayload;
 
 export interface IntakePayload {
   kind: "intake";
@@ -77,6 +85,27 @@ export interface PreAnalysisPayload {
   critical_red_flags: { flag: string; dimension: ScoreDimension | null }[];
   high_red_flags: { flag: string; dimension: ScoreDimension | null }[];
   open_questions_total: number;
+}
+
+export interface PositioningPayload {
+  kind: "positioning";
+  comparables: { name: string; type: string; source_url?: string }[];
+  positioning_summary: string;
+  confidence: "low" | "medium" | "high";
+  confidence_rationale: string;
+  validation_priorities: string[];
+  sources: { url: string; title?: string }[];
+}
+
+export interface ChatPayload {
+  kind: "chat";
+  total_turns: number;
+  recent_turns: {
+    asked_at: string;
+    question: string;
+    answer: string;
+    citations: string[];
+  }[];
 }
 
 /** Full KB shape — keyed by client (engagement) id. */
@@ -147,6 +176,89 @@ export function submitToKnowledgeBase(
   const prior = kb[clientId] ?? {};
   kb[clientId] = { ...prior, [entry.step]: entry };
   writeRaw(kb);
+}
+
+function compactText(value: string, max = 220): string {
+  const oneLine = value.replace(/\s+/g, " ").trim();
+  if (oneLine.length <= max) return oneLine;
+  return `${oneLine.slice(0, max - 1)}…`;
+}
+
+const MAX_CHAT_TURNS_IN_KB = 24;
+
+export function appendChatTurnToKnowledgeBase(args: {
+  clientId: string;
+  question: string;
+  answer: string;
+  citations?: string[];
+}): void {
+  const { clientId, question, answer, citations = [] } = args;
+  const existing = readClientKb(clientId).chat;
+  const priorTurns =
+    existing?.payload.kind === "chat" ? existing.payload.recent_turns : [];
+
+  const nextTurns = [
+    ...priorTurns,
+    {
+      asked_at: new Date().toISOString(),
+      question: compactText(question, 280),
+      answer: compactText(answer, 520),
+      citations: citations.slice(0, 6),
+    },
+  ].slice(-MAX_CHAT_TURNS_IN_KB);
+
+  const payload: ChatPayload = {
+    kind: "chat",
+    total_turns: nextTurns.length,
+    recent_turns: nextTurns,
+  };
+
+  submitToKnowledgeBase(clientId, {
+    step: "chat",
+    submitted_at: new Date().toISOString(),
+    summary: `Stored ${nextTurns.length} chat turn${nextTurns.length === 1 ? "" : "s"}; latest question: ${compactText(question, 96)}`,
+    payload,
+  });
+}
+
+export function submitPositioningToKnowledgeBase(args: {
+  clientId: string;
+  positioning: {
+    comparables?: { name: string; type: string; source_url?: string }[];
+    positioning_summary?: string;
+    confidence?: "low" | "medium" | "high";
+    confidence_rationale?: string;
+    investment_interpretation?: { validation_priorities?: string[] };
+  };
+  sources?: { url: string; title?: string }[];
+}): void {
+  const comparables = (args.positioning.comparables ?? []).slice(0, 10);
+  const payload: PositioningPayload = {
+    kind: "positioning",
+    comparables,
+    positioning_summary: compactText(
+      args.positioning.positioning_summary ?? "",
+      320,
+    ),
+    confidence: args.positioning.confidence ?? "medium",
+    confidence_rationale: compactText(
+      args.positioning.confidence_rationale ?? "",
+      320,
+    ),
+    validation_priorities: (
+      args.positioning.investment_interpretation?.validation_priorities ?? []
+    )
+      .map((v) => compactText(v, 180))
+      .slice(0, 8),
+    sources: (args.sources ?? []).slice(0, 20),
+  };
+
+  submitToKnowledgeBase(args.clientId, {
+    step: "positioning",
+    submitted_at: new Date().toISOString(),
+    summary: `${comparables.length} comparable${comparables.length === 1 ? "" : "s"} identified (${payload.confidence} confidence).`,
+    payload,
+  });
 }
 
 export function clearClientKb(clientId: string): void {
@@ -232,6 +344,34 @@ export function formatKnowledgeBaseEvidence(
           `[knowledge base · Pre-analysis · high red flag${f.dimension ? ` · ${f.dimension}` : ""}] ${f.flag}`,
         ),
       );
+    } else if (p.kind === "positioning") {
+      lines.push(
+        `[knowledge base · Positioning] confidence=${p.confidence}, comparables=${p.comparables.length}`,
+      );
+      if (p.positioning_summary) {
+        lines.push(
+          `[knowledge base · Positioning · summary] ${p.positioning_summary}`,
+        );
+      }
+      p.comparables.forEach((c) =>
+        lines.push(
+          `[knowledge base · Positioning · comparable · ${c.type}] ${c.name}${c.source_url ? ` (${c.source_url})` : ""}`,
+        ),
+      );
+      p.validation_priorities.forEach((v) =>
+        lines.push(`[knowledge base · Positioning · validate] ${v}`),
+      );
+    } else if (p.kind === "chat") {
+      lines.push(`[knowledge base · Chat] turns=${p.total_turns}`);
+      p.recent_turns.slice(-8).forEach((turn) => {
+        lines.push(`[knowledge base · Chat · question] ${turn.question}`);
+        lines.push(`[knowledge base · Chat · answer] ${turn.answer}`);
+        if (turn.citations.length) {
+          lines.push(
+            `[knowledge base · Chat · citations] ${turn.citations.join(", ")}`,
+          );
+        }
+      });
     }
   });
   return lines;

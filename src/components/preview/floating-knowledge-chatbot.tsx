@@ -11,6 +11,7 @@ import {
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import { usePreviewSnapshot } from "@/hooks/use-preview-data";
 import {
+  appendChatTurnToKnowledgeBase,
   formatKnowledgeBaseEvidence,
   readClientKb,
   subscribeKnowledgeBase,
@@ -263,6 +264,16 @@ export function FloatingKnowledgeChatbot() {
           : m,
       ),
     );
+
+    if (selectedId && answerText.trim()) {
+      appendChatTurnToKnowledgeBase({
+        clientId: selectedId,
+        question,
+        answer: answerText,
+        citations,
+      });
+    }
+
     setPending(false);
   };
 
