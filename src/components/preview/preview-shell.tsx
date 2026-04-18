@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import { useNavVisibility } from "@/hooks/use-nav-visibility";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -15,6 +16,24 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
   const { client, ready } = useSelectedPreviewClient();
   const { visibleTabs } = useNavVisibility();
   const isHome = pathname === "/preview";
+  const navRef = useRef<HTMLElement | null>(null);
+  const activeTabRef = useRef<HTMLAnchorElement | null>(null);
+
+  useEffect(() => {
+    const el = activeTabRef.current;
+    const nav = navRef.current;
+    if (!el || !nav) return;
+    // Bring the active tab fully into view within the horizontal nav
+    const elRect = el.getBoundingClientRect();
+    const navRect = nav.getBoundingClientRect();
+    if (elRect.right > navRect.right || elRect.left < navRect.left) {
+      el.scrollIntoView({
+        behavior: "smooth",
+        inline: "end",
+        block: "nearest",
+      });
+    }
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -73,7 +92,7 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
 
       <div className="print-hide sticky top-0 z-40 border-b bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 sm:px-6">
-          <nav className="flex-1 overflow-x-auto">
+          <nav ref={navRef} className="flex-1 overflow-x-auto">
             <ul className="flex min-w-max items-center gap-1.5 py-2 sm:gap-2 sm:py-3">
               {visibleTabs.map((tab) => {
                 const isActive =
@@ -83,6 +102,7 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
                 return (
                   <li key={tab.id}>
                     <Link
+                      ref={isActive ? activeTabRef : undefined}
                       href={tab.href}
                       className={`inline-flex rounded-full px-3 py-1.5 text-sm font-medium transition sm:px-4 sm:py-2 sm:text-base ${
                         isActive
