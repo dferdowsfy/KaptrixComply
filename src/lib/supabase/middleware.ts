@@ -8,6 +8,8 @@ import { isSupabaseConfigured } from "@/lib/env";
 const PUBLIC_PATH_PREFIXES = [
   "/preview",
   "/login",
+  "/account",
+  "/how-it-works",
   "/api/auth",
   "/api/preview",
   "/api/chat",

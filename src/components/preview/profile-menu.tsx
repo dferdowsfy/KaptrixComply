@@ -103,7 +103,7 @@ export function ProfileMenu() {
               {user.email ?? "Unknown"}
             </p>
           </div>
-          <MenuItem href="/settings" onClick={() => setOpen(false)}>
+          <MenuItem href="/account" onClick={() => setOpen(false)}>
             <SettingsIcon className="h-4 w-4" />
             Account settings
           </MenuItem>
