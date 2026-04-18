@@ -44,8 +44,8 @@ const LAYERS = [
   },
   {
     id: "02",
-    title: "Evidence signal engine",
-    body: "Documents, claims, and inconsistencies are converted into structured proposals that can be reviewed and approved.",
+    title: "Adaptive knowledge brain",
+    body: "Every document, claim, and precedent is ingested into a living knowledge base that continuously learns from new inputs — so decisions stay grounded in the strongest, most current evidence available.",
     accent: "from-violet-500 to-violet-700",
   },
   {
@@ -121,9 +121,7 @@ export default function HomePage() {
               <span className="headline-gradient"> one decision system.</span>
             </h1>
             <p className="mt-8 max-w-2xl text-lg leading-9 text-slate-300 sm:text-xl">
-              KAPTRIX combines deterministic scoring, evidence-backed AI
-              signals, and operator judgment into one platform that stands up
-              in IC and investment committee scrutiny.
+              KAPTRIX combines deterministic scoring, evidence-backed AI signals, and operator judgment into one platform that stands up in IC and investment committee scrutiny.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Link
