@@ -1,3 +1,5 @@
+import { ChangePasswordCard } from "@/components/settings/change-password-card";
+
 export default function SettingsPage() {
   return (
     <div className="space-y-6">
@@ -9,6 +11,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
+        <ChangePasswordCard />
         <div className="rounded-lg border bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold text-gray-900">
             Prompt Library
