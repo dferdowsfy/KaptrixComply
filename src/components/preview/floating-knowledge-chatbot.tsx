@@ -13,6 +13,7 @@ import { usePreviewSnapshot } from "@/hooks/use-preview-data";
 import {
   appendChatTurnToKnowledgeBase,
   formatKnowledgeBaseEvidence,
+  KNOWLEDGE_STEP_LABELS,
   readClientKb,
   subscribeKnowledgeBase,
   type KnowledgeEntry,
@@ -319,31 +320,34 @@ export function FloatingKnowledgeChatbot() {
           "
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-700/60 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-5 py-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-base font-bold text-white shadow-lg">
-                K
+          <div className="border-b border-slate-700/60 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-5 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-base font-bold text-white shadow-lg">
+                  K
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-white">
+                    Kaptrix AI
+                  </p>
+                  <p className="flex items-center gap-1.5 truncate text-xs text-slate-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+                    Grounded in {client.target}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="truncate text-base font-semibold text-white">
-                  Kaptrix AI
-                </p>
-                <p className="flex items-center gap-1.5 truncate text-xs text-slate-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                  Grounded in {client.target}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="ml-2 rounded-md p-1.5 text-slate-400 transition hover:bg-slate-700/60 hover:text-white"
-              aria-label="Close chatbot"
+              <button
+                onClick={() => setIsOpen(false)}
+                className="ml-2 rounded-md p-1.5 text-slate-400 transition hover:bg-slate-700/60 hover:text-white"
+                aria-label="Close chatbot"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
+            </div>
+            <KbSyncedRow kb={kb} />
           </div>
 
           {/* Messages */}
@@ -481,6 +485,41 @@ export function FloatingKnowledgeChatbot() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function KbSyncedRow({
+  kb,
+}: {
+  kb: Partial<Record<KnowledgeStep, KnowledgeEntry>>;
+}) {
+  const order: KnowledgeStep[] = [
+    "intake",
+    "coverage",
+    "insights",
+    "pre_analysis",
+    "scoring",
+    "positioning",
+    "chat",
+  ];
+  const synced = order.filter((step) => Boolean(kb[step]));
+  if (synced.length === 0) return null;
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+      <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">
+        Knowledge
+      </span>
+      {synced.map((step) => (
+        <span
+          key={step}
+          title={kb[step]?.summary}
+          className="rounded-full border border-slate-700/70 bg-slate-800/60 px-2 py-0.5 text-[10px] font-medium text-slate-300"
+        >
+          {KNOWLEDGE_STEP_LABELS[step]}
+        </span>
+      ))}
     </div>
   );
 }
