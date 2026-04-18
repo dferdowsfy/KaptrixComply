@@ -91,8 +91,8 @@ export function PlatformShowcase({ steps }: Props) {
     setAutoplay(false);
   };
 
-  const Stepper = ({ compact = false }: { compact?: boolean }) => (
-    <ol className={`grid gap-2 ${compact ? "grid-cols-3" : "sm:grid-cols-3"}`}>
+  const Stepper = () => (
+    <ol className="relative grid gap-2 sm:grid-cols-3">
       {steps.map((step, idx) => {
         const isActive = idx === active;
         return (
@@ -104,19 +104,17 @@ export function PlatformShowcase({ steps }: Props) {
                 setAutoplay(false);
               }}
               aria-current={isActive ? "step" : undefined}
-              className={`group relative w-full overflow-hidden rounded-2xl border p-3 text-left transition sm:p-4 ${
+              className={`group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border p-4 text-left transition ${
                 isActive
-                  ? compact
-                    ? "border-white/30 bg-white/10 text-white shadow-lg"
-                    : "border-slate-900 bg-slate-900 text-white shadow-lg"
-                  : compact
-                    ? "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
-                    : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                  ? "border-white/30 bg-white/10 text-white shadow-lg"
+                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:border-white/20 hover:bg-white/[0.06]"
               }`}
             >
               <div
                 aria-hidden
-                className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${step.accent}`}
+                className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${step.accent} ${
+                  isActive ? "opacity-100" : "opacity-40"
+                }`}
               />
               <p
                 className={`text-[10px] font-semibold uppercase tracking-[0.28em] sm:text-[11px] sm:tracking-[0.3em] ${
@@ -127,14 +125,17 @@ export function PlatformShowcase({ steps }: Props) {
               </p>
               <p
                 className={`mt-1 text-sm font-semibold sm:text-base ${
-                  isActive
-                    ? "text-white"
-                    : compact
-                      ? "text-slate-200"
-                      : "text-slate-800"
+                  isActive ? "text-white" : "text-slate-200"
                 }`}
               >
                 {step.title}
+              </p>
+              <p
+                className={`mt-1 text-xs leading-5 sm:text-[13px] sm:leading-5 ${
+                  isActive ? "text-slate-200" : "text-slate-400"
+                }`}
+              >
+                {step.description}
               </p>
             </button>
           </li>
@@ -178,9 +179,7 @@ export function PlatformShowcase({ steps }: Props) {
   return (
     <>
       <div className="mt-14">
-        <Stepper />
-
-        <div className="relative mt-8 overflow-hidden rounded-[2rem] border border-slate-800/20 bg-slate-950 p-4 shadow-2xl sm:p-6">
+        <div className="relative overflow-hidden rounded-[2rem] border border-slate-800/20 bg-slate-950 p-4 shadow-2xl sm:p-6">
           <div
             aria-hidden
             className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${current.accent} transition-all duration-700`}
@@ -190,20 +189,10 @@ export function PlatformShowcase({ steps }: Props) {
             className="pointer-events-none absolute -top-32 -right-20 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl"
           />
 
-          <div
-            key={current.kicker}
-            className="showcase-fade relative mb-5 flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-4 text-white sm:px-5"
-          >
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-indigo-200">
-                {current.kicker}
-              </p>
-              <p className="mt-1 text-lg font-semibold sm:text-xl">
-                {current.title}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-300">
-                {current.description}
-              </p>
+          {/* Layer stepper anchored inside the box */}
+          <div className="relative mb-5 flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <Stepper />
             </div>
             <button
               type="button"
@@ -211,7 +200,7 @@ export function PlatformShowcase({ steps }: Props) {
                 setExpanded(true);
                 setAutoplay(false);
               }}
-              className="shrink-0 rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20"
+              className="mt-1 shrink-0 rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20"
               aria-label="Expand to fullscreen"
               title="Expand"
             >
@@ -283,7 +272,7 @@ export function PlatformShowcase({ steps }: Props) {
           </div>
 
           <div className="px-4 pt-3 sm:px-6">
-            <Stepper compact />
+            <Stepper />
           </div>
 
           <div className="relative mx-auto mt-3 flex w-full max-w-[1400px] flex-1 overflow-hidden px-4 pb-4 sm:px-6 sm:pb-6">
