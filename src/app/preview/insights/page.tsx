@@ -1,6 +1,8 @@
 "use client";
 
+import { useCallback } from "react";
 import { SectionHeader } from "@/components/preview/preview-shell";
+import { SubmitToKnowledgeBase } from "@/components/preview/submit-to-knowledge-base";
 import {
   KnowledgeInsightsPanel,
   type KnowledgeInsight,
@@ -11,6 +13,7 @@ import {
   mergeInsightIntoAnswers,
   type PreviewAnswers,
 } from "@/lib/preview-intake";
+import type { InsightsPayload } from "@/lib/preview/knowledge-base";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import { usePreviewSnapshot } from "@/hooks/use-preview-data";
 
@@ -37,6 +40,23 @@ export default function PreviewInsightsPage() {
     window.localStorage.setItem(PREVIEW_INTAKE_STORAGE_KEY, JSON.stringify(next));
   };
 
+  const buildPayload = useCallback(() => {
+    const by_category: Record<string, number> = {};
+    let high_confidence_count = 0;
+    for (const i of insights) {
+      by_category[i.category] = (by_category[i.category] ?? 0) + 1;
+      if (i.confidence === "high") high_confidence_count += 1;
+    }
+    const payload: InsightsPayload = {
+      kind: "insights",
+      insights_total: insights.length,
+      by_category,
+      high_confidence_count,
+    };
+    const summary = `${insights.length} insights · ${high_confidence_count} high-confidence`;
+    return { payload, summary };
+  }, [insights]);
+
   return (
     <div className="space-y-4">
       <SectionHeader
@@ -51,6 +71,13 @@ export default function PreviewInsightsPage() {
           onInsertToIntake={handleInsertToIntake}
         />
       </div>
+      <SubmitToKnowledgeBase
+        step="insights"
+        buildPayload={buildPayload}
+        disabledReason={
+          insights.length === 0 ? "No insights to submit yet." : null
+        }
+      />
     </div>
   );
 }

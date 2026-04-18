@@ -24,7 +24,13 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
               Operator Workspace
             </h1>
           </div>
-          <div className="inline-flex self-start sm:self-auto">
+          <div className="inline-flex items-center gap-3 self-start sm:self-auto">
+            <Link
+              href="/how-it-works"
+              className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700 hover:text-indigo-900"
+            >
+              How it works
+            </Link>
             <ConnectionStatus />
           </div>
         </div>

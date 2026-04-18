@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { Document } from "@/lib/types";
 import {
   INDUSTRY_OPTIONS,
@@ -9,9 +9,19 @@ import {
   type IndustryArtifact,
 } from "@/lib/industry-requirements";
 
+export interface IndustryCoverageState {
+  industry: Industry;
+  industry_label: string;
+  total: number;
+  provided: number;
+  missing_required: string[];
+  gap_categories: string[];
+}
+
 interface Props {
   documents: Document[];
   defaultIndustry?: Industry;
+  onStateChange?: (state: IndustryCoverageState) => void;
 }
 
 type Status = "provided" | "partial" | "missing";
@@ -26,6 +36,7 @@ function statusFor(artifact: IndustryArtifact, docs: Document[]): Status {
 export function IndustryCoverageMatrix({
   documents,
   defaultIndustry = "legal_tech",
+  onStateChange,
 }: Props) {
   const [industry, setIndustry] = useState<Industry>(defaultIndustry);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -44,10 +55,30 @@ export function IndustryCoverageMatrix({
 
   const provided = rows.filter((r) => r.status === "provided").length;
   const total = rows.length;
-  const missingRequired = rows.filter(
-    (r) => r.status === "missing" && r.artifact.is_required,
+  const missingRequired = useMemo(
+    () => rows.filter((r) => r.status === "missing" && r.artifact.is_required),
+    [rows],
   );
   const coveragePct = Math.round((provided / total) * 100);
+
+  const stateSnapshot = useMemo<IndustryCoverageState>(
+    () => ({
+      industry,
+      industry_label: profile.label,
+      total,
+      provided,
+      missing_required: missingRequired.map((r) => r.artifact.display_name),
+      gap_categories: rows
+        .filter((r) => r.status !== "provided")
+        .map((r) => r.artifact.display_name),
+    }),
+    [industry, profile.label, total, provided, missingRequired, rows],
+  );
+
+  useEffect(() => {
+    if (!onStateChange) return;
+    onStateChange(stateSnapshot);
+  }, [stateSnapshot, onStateChange]);
 
   return (
     <div className="space-y-5">

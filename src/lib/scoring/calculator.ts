@@ -165,6 +165,16 @@ export interface DeriveDecisionInput {
   analyses?: PreAnalysis[];
   /** Composite from the prior scorecard, if a previous one exists. */
   priorComposite?: number | null;
+  /**
+   * Optional pre-computed context adjustment from the knowledge base
+   * (intake, coverage, insights, pre-analysis submissions). When
+   * provided, the decision engine operates on the context-aware
+   * composite and dimension scores instead of the raw ones.
+   */
+  contextAdjustment?: {
+    composite_delta: number;
+    dimension_delta: Record<ScoreDimension, number>;
+  } | null;
 }
 
 export function deriveDecision(input: DeriveDecisionInput): DecisionResult {
@@ -173,7 +183,35 @@ export function deriveDecision(input: DeriveDecisionInput): DecisionResult {
     input.status,
     input.priorComposite,
   );
-  const composite = calculateCompositeScore(input.scores);
+  const baseComposite = calculateCompositeScore(input.scores);
+  const adj = input.contextAdjustment;
+
+  // Apply context adjustment (clamped 0..5 per dimension) if provided.
+  const adjusted_dimension_scores: Record<ScoreDimension, number> = adj
+    ? (Object.fromEntries(
+        (Object.entries(baseComposite.dimension_scores) as [ScoreDimension, number][]).map(
+          ([k, v]) => [
+            k,
+            Math.round(
+              Math.max(0, Math.min(5, v + (adj.dimension_delta[k] ?? 0))) * 10,
+            ) / 10,
+          ],
+        ),
+      ) as Record<ScoreDimension, number>)
+    : baseComposite.dimension_scores;
+
+  const composite_score = adj
+    ? Math.round(
+        Math.max(0, Math.min(5, baseComposite.composite_score + adj.composite_delta)) *
+          10,
+      ) / 10
+    : baseComposite.composite_score;
+
+  const composite = {
+    composite_score,
+    dimension_scores: adjusted_dimension_scores,
+  };
+
   const blocking = blockingDimensions(composite.dimension_scores);
   const criticals = countCriticalRedFlags(input.analyses);
   const prior =
@@ -184,6 +222,9 @@ export function deriveDecision(input: DeriveDecisionInput): DecisionResult {
   const rationale: string[] = [];
   rationale.push(
     `Composite ${composite.composite_score.toFixed(1)}/5.0` +
+      (adj && adj.composite_delta !== 0
+        ? ` (context Δ ${adj.composite_delta >= 0 ? "+" : ""}${adj.composite_delta.toFixed(2)})`
+        : "") +
       (delta !== null ? ` (Δ ${delta >= 0 ? "+" : ""}${delta.toFixed(1)} vs. prior)` : ""),
   );
   if (criticals > 0) rationale.push(`${criticals} critical red flag(s)`);

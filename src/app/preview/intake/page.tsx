@@ -1,12 +1,14 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { IntakeQuestionnaire } from "@/components/engagements/intake-questionnaire";
 import { SectionHeader } from "@/components/preview/preview-shell";
+import { SubmitToKnowledgeBase } from "@/components/preview/submit-to-knowledge-base";
 import {
   PREVIEW_INTAKE_STORAGE_KEY,
   type PreviewAnswers,
 } from "@/lib/preview-intake";
+import type { IntakePayload } from "@/lib/preview/knowledge-base";
 
 const STORAGE_EVENT = "kaptrix:preview-intake-change";
 const EMPTY_PREVIEW_ANSWERS: PreviewAnswers = {};
@@ -70,6 +72,33 @@ export default function PreviewIntakePage() {
     notifyPreviewAnswersChanged();
   };
 
+  const buildIntakePayload = useCallback(() => {
+    const asArray = (v: PreviewAnswers[string] | undefined): string[] =>
+      Array.isArray(v) ? v.map(String) : v ? [String(v)] : [];
+
+    const regulatory_exposure = asArray(answers["regulatory_exposure"]);
+    const diligence_priorities = asArray(answers["diligence_priorities"]);
+    const red_flag_priors = asArray(answers["red_flag_priors"]);
+    const answered_fields = Object.values(answers).filter((v) =>
+      Array.isArray(v) ? v.length > 0 : v !== "" && v !== null && v !== undefined,
+    ).length;
+
+    const payload: IntakePayload = {
+      kind: "intake",
+      answered_fields,
+      regulatory_exposure,
+      diligence_priorities,
+      red_flag_priors,
+    };
+    const summary = `${answered_fields} fields · ${regulatory_exposure.length} regulatory · ${red_flag_priors.length} prior flags`;
+    return { payload, summary };
+  }, [answers]);
+
+  const disabledReason =
+    Object.keys(answers).length === 0
+      ? "Answer at least one intake question before submitting."
+      : null;
+
   return (
     <div className="space-y-4">
       <SectionHeader
@@ -78,6 +107,11 @@ export default function PreviewIntakePage() {
         description="Comprehensive intake with industry-specific depth, preselected options, and optional free-form context at each prompt to build stronger platform intelligence."
       />
       <IntakeQuestionnaire initialAnswers={answers} onChange={handleChange} />
+      <SubmitToKnowledgeBase
+        step="intake"
+        buildPayload={buildIntakePayload}
+        disabledReason={disabledReason}
+      />
     </div>
   );
 }

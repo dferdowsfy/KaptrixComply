@@ -7,6 +7,11 @@ import {
   deriveDecision,
   type DecisionResult,
 } from "@/lib/scoring/calculator";
+import {
+  aggregateContextAdjustment,
+  type ContextSignal,
+} from "@/lib/scoring/context";
+import { KNOWLEDGE_STEP_LABELS } from "@/lib/preview/knowledge-base";
 import type {
   BenchmarkCase,
   DealStage,
@@ -28,6 +33,8 @@ interface Props {
   status?: EngagementStatus;
   analyses?: PreAnalysis[];
   priorComposite?: number | null;
+  /** Context signals derived from the knowledge base (intake, coverage, insights, pre-analysis). */
+  contextSignals?: ContextSignal[];
 }
 
 export function ScoringPanel({
@@ -40,6 +47,7 @@ export function ScoringPanel({
   status = "scoring",
   analyses = [],
   priorComposite = null,
+  contextSignals = [],
 }: Props) {
   const [scores, setScores] = useState<Score[]>(initialScores);
   const [expandedDimension, setExpandedDimension] = useState<ScoreDimension | null>(
@@ -48,12 +56,21 @@ export function ScoringPanel({
   const [saving, setSaving] = useState(false);
 
   const composite = calculateCompositeScore(scores);
+  const contextAdjustment = aggregateContextAdjustment(contextSignals);
+  const adjustedComposite =
+    Math.round(
+      Math.max(
+        0,
+        Math.min(5, composite.composite_score + contextAdjustment.composite_delta),
+      ) * 10,
+    ) / 10;
   const decision = deriveDecision({
     dealStage,
     status,
     scores,
     analyses,
     priorComposite,
+    contextAdjustment,
   });
 
   // Optimistically update local score state so the composite score and
@@ -173,11 +190,23 @@ export function ScoringPanel({
       <div className="rounded-lg border bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-gray-500">Composite Score</p>
+            <p className="text-xs font-medium text-gray-500">
+              {contextSignals.length > 0
+                ? "Context-aware composite"
+                : "Composite Score"}
+            </p>
             <p className="mt-1 text-4xl font-bold text-gray-900">
-              {composite.composite_score.toFixed(1)}
+              {adjustedComposite.toFixed(1)}
               <span className="text-lg text-gray-400"> / 5.0</span>
             </p>
+            {contextSignals.length > 0 && (
+              <p className="mt-1 text-xs text-gray-500">
+                Operator composite {composite.composite_score.toFixed(1)}
+                {" · "}
+                context Δ {contextAdjustment.composite_delta >= 0 ? "+" : ""}
+                {contextAdjustment.composite_delta.toFixed(2)}
+              </p>
+            )}
           </div>
           {!previewMode && saving && (
             <span className="text-xs text-gray-400">Saving…</span>
@@ -193,24 +222,45 @@ export function ScoringPanel({
 
         {/* Dimension score bars */}
         <div className="mt-4 space-y-2">
-          {composite.dimension_details.map((dim) => (
-            <div key={dim.dimension} className="flex items-center gap-3">
-              <span className="w-40 text-xs text-gray-600 truncate">
-                {dim.name}
-              </span>
-              <div className="flex-1 h-2 rounded-full bg-gray-100">
-                <div
-                  className="h-2 rounded-full bg-gray-900 transition-all"
-                  style={{ width: `${(dim.average_score / 5) * 100}%` }}
-                />
+          {composite.dimension_details.map((dim) => {
+            const delta = contextAdjustment.dimension_delta[dim.dimension] ?? 0;
+            const adjusted = Math.max(
+              0,
+              Math.min(5, dim.average_score + delta),
+            );
+            return (
+              <div key={dim.dimension} className="flex items-center gap-3">
+                <span className="w-40 text-xs text-gray-600 truncate">
+                  {dim.name}
+                </span>
+                <div className="flex-1 h-2 rounded-full bg-gray-100 relative">
+                  <div
+                    className="h-2 rounded-full bg-gray-900 transition-all"
+                    style={{ width: `${(adjusted / 5) * 100}%` }}
+                  />
+                </div>
+                <span className="w-14 text-right text-xs font-medium text-gray-700">
+                  {adjusted.toFixed(1)}
+                  {delta !== 0 && (
+                    <span
+                      className={`ml-1 text-[10px] ${
+                        delta < 0 ? "text-rose-600" : "text-emerald-600"
+                      }`}
+                    >
+                      ({delta > 0 ? "+" : ""}
+                      {delta.toFixed(2)})
+                    </span>
+                  )}
+                </span>
               </div>
-              <span className="w-8 text-right text-xs font-medium text-gray-700">
-                {dim.average_score.toFixed(1)}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
+
+      {contextSignals.length > 0 && (
+        <ContextAdjustmentPanel signals={contextSignals} />
+      )}
 
       {/* Pattern matches sidebar */}
       {patternMatches.length > 0 && (
@@ -371,6 +421,178 @@ function SubCriterionInput({
           Rationale must be at least 20 characters
         </p>
       )}
+      <ScoringCopilot
+        dimension={dimension}
+        subCriterion={subKey}
+        score={score}
+        rationale={rationale}
+      />
+    </div>
+  );
+}
+
+interface GuidancePayload {
+  meaning: string;
+  must_be_true: string[];
+  to_reach_next_level: { delta: string; gaps: string[] };
+  overrated_if: string[];
+  suggested_evidence_to_request: string[];
+}
+
+function ScoringCopilot({
+  dimension,
+  subCriterion,
+  score,
+  rationale,
+}: {
+  dimension: string;
+  subCriterion: string;
+  score: number;
+  rationale: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [guidance, setGuidance] = useState<GuidancePayload | null>(null);
+  const [scoredFor, setScoredFor] = useState<number | null>(null);
+
+  const stale = guidance !== null && scoredFor !== null && scoredFor !== score;
+
+  const fetchGuidance = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/scores/guidance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dimension,
+          sub_criterion: subCriterion,
+          score,
+          operator_rationale: rationale,
+        }),
+      });
+      const json = (await res.json()) as
+        | { guidance: GuidancePayload }
+        | { error: string };
+      if (!res.ok || !("guidance" in json)) {
+        const message = "error" in json ? json.error : `Request failed (${res.status})`;
+        throw new Error(message);
+      }
+      setGuidance(json.guidance);
+      setScoredFor(score);
+      setOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load guidance");
+    } finally {
+      setLoading(false);
+    }
+  }, [dimension, subCriterion, score, rationale]);
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            if (guidance && !stale) {
+              setOpen((prev) => !prev);
+            } else {
+              void fetchGuidance();
+            }
+          }}
+          disabled={loading}
+          className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading
+            ? "Asking copilot…"
+            : guidance && !stale
+              ? open
+                ? "Hide scoring copilot"
+                : "Show scoring copilot"
+              : `Ask scoring copilot (score ${score.toFixed(1)})`}
+        </button>
+        {stale && (
+          <span className="text-[11px] text-amber-600">
+            Score changed — refresh guidance
+          </span>
+        )}
+        {error && <span className="text-[11px] text-red-600">{error}</span>}
+      </div>
+
+      {open && guidance && (
+        <div className="mt-2 space-y-3 rounded-md border border-indigo-200 bg-indigo-50/60 p-3 text-xs text-gray-800">
+          <CopilotSection title={`What ${scoredFor?.toFixed(1) ?? score.toFixed(1)} means here`}>
+            <p>{guidance.meaning}</p>
+          </CopilotSection>
+          <CopilotList title="What must be true to justify it" items={guidance.must_be_true} />
+          <CopilotList
+            title={`To reach next level (${guidance.to_reach_next_level.delta})`}
+            items={guidance.to_reach_next_level.gaps}
+          />
+          <CopilotList
+            title="Why this might be overrated"
+            items={guidance.overrated_if}
+            tone="warn"
+          />
+          <CopilotList
+            title="Evidence to request from the target"
+            items={guidance.suggested_evidence_to_request}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CopilotSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-900">
+        {title}
+      </p>
+      <div className="mt-1 text-xs leading-relaxed text-gray-800">{children}</div>
+    </div>
+  );
+}
+
+function CopilotList({
+  title,
+  items,
+  tone = "neutral",
+}: {
+  title: string;
+  items: string[];
+  tone?: "neutral" | "warn";
+}) {
+  if (!items || items.length === 0) return null;
+  const titleClass =
+    tone === "warn"
+      ? "text-amber-800"
+      : "text-indigo-900";
+  return (
+    <div>
+      <p
+        className={`text-[10px] font-semibold uppercase tracking-wider ${titleClass}`}
+      >
+        {title}
+      </p>
+      <ul className="mt-1 space-y-1 text-xs leading-relaxed text-gray-800">
+        {items.map((item, i) => (
+          <li key={i} className="flex gap-2">
+            <span aria-hidden className="text-gray-400">
+              •
+            </span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -411,6 +633,66 @@ function DecisionBadge({ decision }: { decision: DecisionResult }) {
           <li key={i}>• {r}</li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function ContextAdjustmentPanel({ signals }: { signals: ContextSignal[] }) {
+  const grouped = signals.reduce<Record<string, ContextSignal[]>>(
+    (acc, s) => {
+      (acc[s.source] ??= []).push(s);
+      return acc;
+    },
+    {},
+  );
+  const sources = Object.keys(grouped) as (keyof typeof KNOWLEDGE_STEP_LABELS)[];
+
+  return (
+    <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-indigo-900">
+          Context signals feeding the score
+        </p>
+        <span className="text-[10px] uppercase tracking-[0.2em] text-indigo-700">
+          {signals.length} signal{signals.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-indigo-800/80">
+        Submissions from earlier steps adjust each dimension. Caps prevent any
+        single step from overriding operator judgment.
+      </p>
+      <div className="mt-3 space-y-3">
+        {sources.map((src) => (
+          <div key={src}>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-800">
+              From {KNOWLEDGE_STEP_LABELS[src]}
+            </p>
+            <ul className="mt-1 space-y-1">
+              {grouped[src].map((s, i) => (
+                <li
+                  key={`${src}-${i}`}
+                  className="flex items-start justify-between gap-3 text-xs text-gray-800"
+                >
+                  <span>
+                    <span className="font-mono text-[10px] text-gray-500">
+                      {s.dimension}
+                    </span>{" "}
+                    — {s.reason}
+                  </span>
+                  <span
+                    className={`shrink-0 font-semibold ${
+                      s.delta < 0 ? "text-rose-700" : "text-emerald-700"
+                    }`}
+                  >
+                    {s.delta > 0 ? "+" : ""}
+                    {s.delta.toFixed(2)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
