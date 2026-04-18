@@ -31,3 +31,13 @@ export function isGroqConfigured(): boolean {
 export function getGroqApiKey(): string {
   return getServerEnv("GROQ_API_KEY");
 }
+
+export function isOpenRouterConfigured(): boolean {
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) return false;
+  return !isPlaceholder(apiKey);
+}
+
+export function getOpenRouterApiKey(): string {
+  return getServerEnv("OPENROUTER_API_KEY");
+}

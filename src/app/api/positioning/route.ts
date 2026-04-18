@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import Groq from "groq-sdk";
-import { getGroqClient } from "@/lib/anthropic/client";
-import { isGroqConfigured } from "@/lib/env";
+import { getOpenRouterApiKey, isOpenRouterConfigured } from "@/lib/env";
 import { getPreviewSnapshot } from "@/lib/preview/data";
 import { PREVIEW_CLIENTS } from "@/lib/preview-clients";
+import { sanitizeForExternalLLM } from "@/lib/sanitize";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,23 +12,23 @@ interface Body {
   knowledge_base?: string;
 }
 
-// Use Groq's compound model — it has built-in web search and visit-website
-// tools, so the LLM can pull live competitor / market data instead of
-// inventing peers.
-const COMPOUND_MODEL = "groq/compound";
+// OpenRouter web-search-enabled model. This route is the ONLY external
+// path that leaves our infra; payload is sanitized before send.
+const OPENROUTER_MODEL = "openai/gpt-4o-mini-search-preview";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-const SYSTEM_PROMPT = `You are Kaptrix, an AI diligence analyst performing CONTEXTUAL BENCHMARKING.
-You do NOT assess companies in isolation. You assess them RELATIVE to contextually relevant peers.
+const SYSTEM_PROMPT = `You are an AI diligence analyst performing CONTEXTUAL BENCHMARKING.
+You do NOT assess companies in isolation — you assess them RELATIVE to contextually relevant peers.
 
-You have access to live web search and website-visit tools. USE THEM to:
+You have a built-in web search tool. USE IT to:
 - Identify real, currently-operating companies and products that are direct or analog peers of the target.
-- Pull recent (last 12-18 months) public information: funding rounds, customer logos, product launches, model/vendor stack, regulatory posture, security certifications, incidents.
-- Verify any claims you are uncertain about.
+- Pull recent (last 12-18 months) public information: funding rounds, customer logos, product launches, model/vendor stack, regulatory posture, certifications, incidents.
+- Verify any claim you are uncertain about.
 
 Procedure:
-1. TARGET CONTEXT — classify target (organization or product), industry, AI use case, business model, customer segment, data sensitivity, deployment maturity, vendor stack, regulatory exposure, architecture pattern. Ground in evidence corpus AND fresh web research.
-2. COMPARABLE SELECTION — pick 3-7 REAL, NAMED competitors / analog products you have verified via web search. Match on AI use case, business model, data sensitivity, deployment maturity, technical approach, regulatory constraints. Cite a source URL for each comparable. Never invent companies. Never use generic placeholders.
-3. RELATIVE COMPARISON — for each dimension, classify target as "ahead" / "in_line" / "behind" peers, with concrete evidence (cite peer when relevant).
+1. TARGET CONTEXT — classify the target (organization or product), industry, AI use case, business model, customer segment, data sensitivity, deployment maturity, vendor stack, regulatory exposure, architecture pattern.
+2. COMPARABLE SELECTION — pick 3-7 REAL, NAMED competitors / analog products you have verified via web search. Match on AI use case, business model, data sensitivity, deployment maturity, technical approach, regulatory constraints. Cite a source URL for each comparable. Never invent companies.
+3. RELATIVE COMPARISON — for each dimension, classify target as "ahead" / "in_line" / "behind" peers, with concrete evidence.
 4. POSITIONING SUMMARY — specific, non-generic relative position.
 5. INVESTMENT INTERPRETATION — differentiation real? durability? risk concentration? validation priorities?
 6. CONFIDENCE — low/medium/high based on data completeness and source quality.
@@ -49,19 +48,10 @@ Return ONLY valid JSON matching this exact schema (no prose, no markdown, no cod
     "architecture_pattern": string
   },
   "comparables": [
-    {
-      "name": string,
-      "type": "company" | "product" | "analog",
-      "rationale": string,
-      "source_url": string
-    }
+    { "name": string, "type": "company" | "product" | "analog", "rationale": string, "source_url": string }
   ],
   "comparison": [
-    {
-      "dimension": string,
-      "position": "ahead" | "in_line" | "behind",
-      "evidence": string
-    }
+    { "dimension": string, "position": "ahead" | "in_line" | "behind", "evidence": string }
   ],
   "positioning_summary": string,
   "investment_interpretation": {
@@ -78,8 +68,10 @@ function buildEvidence(
   snapshot: Awaited<ReturnType<typeof getPreviewSnapshot>>,
 ): string {
   const parts: string[] = [];
+  // Note: target_company_name is intentionally PUBLIC (it's what we're
+  // benchmarking). Client firm name is excluded entirely.
   parts.push(
-    `TARGET: ${snapshot.engagement.target_company_name} | client: ${snapshot.engagement.client_firm_name} | stage: ${snapshot.engagement.deal_stage} | tier: ${snapshot.engagement.tier}`,
+    `TARGET: ${snapshot.engagement.target_company_name} | stage: ${snapshot.engagement.deal_stage}`,
   );
   snapshot.knowledgeInsights.slice(0, 8).forEach((k) => {
     parts.push(`[insight] ${k.insight.slice(0, 220)}`);
@@ -93,7 +85,9 @@ function buildEvidence(
     `[summary] ${snapshot.executiveReport.executive_summary.slice(0, 600)}`,
   );
   snapshot.executiveReport.critical_findings.slice(0, 4).forEach((f) =>
-    parts.push(`[finding · ${f.severity}] ${f.title}: ${f.what_we_found.slice(0, 180)}`),
+    parts.push(
+      `[finding · ${f.severity}] ${f.title}: ${f.what_we_found.slice(0, 180)}`,
+    ),
   );
   snapshot.scores.slice(0, 12).forEach((s) =>
     parts.push(
@@ -101,16 +95,6 @@ function buildEvidence(
     ),
   );
   return parts.join("\n").slice(0, 6000);
-}
-
-function buildPeerKnowledgeBase(currentClientId: string): string {
-  const peers = PREVIEW_CLIENTS.filter((c) => c.id !== currentClientId);
-  return peers
-    .map(
-      (p) =>
-        `INTERNAL ENGAGEMENT: ${p.target} | industry: ${p.industry} | summary: ${p.summary}`,
-    )
-    .join("\n");
 }
 
 function extractJson(text: string): unknown {
@@ -129,45 +113,49 @@ function extractJson(text: string): unknown {
   }
 }
 
-interface ExecutedToolSearchResult {
-  url?: string;
-  title?: string;
+interface OpenRouterAnnotation {
+  type?: string;
+  url_citation?: { url?: string; title?: string };
 }
 
-interface ExecutedTool {
-  type?: string;
-  index?: number;
-  search_results?: { results?: ExecutedToolSearchResult[] };
-  arguments?: string;
-  output?: string;
+interface OpenRouterMessage {
+  content?: string;
+  annotations?: OpenRouterAnnotation[];
+}
+
+interface OpenRouterChoice {
+  message?: OpenRouterMessage;
+}
+
+interface OpenRouterResponse {
+  choices?: OpenRouterChoice[];
+  error?: { message?: string };
 }
 
 function extractWebSources(
-  message: Groq.Chat.ChatCompletion.Choice["message"],
+  message: OpenRouterMessage | undefined,
 ): { url: string; title?: string }[] {
-  const tools = (message as unknown as { executed_tools?: ExecutedTool[] })
-    .executed_tools;
-  if (!Array.isArray(tools)) return [];
+  const annotations = message?.annotations;
+  if (!Array.isArray(annotations)) return [];
   const seen = new Set<string>();
   const sources: { url: string; title?: string }[] = [];
-  for (const t of tools) {
-    const results = t.search_results?.results;
-    if (Array.isArray(results)) {
-      for (const r of results) {
-        if (r.url && !seen.has(r.url)) {
-          seen.add(r.url);
-          sources.push({ url: r.url, title: r.title });
-        }
-      }
+  for (const a of annotations) {
+    const c = a.url_citation;
+    if (c?.url && !seen.has(c.url)) {
+      seen.add(c.url);
+      sources.push({ url: c.url, title: c.title });
     }
   }
   return sources.slice(0, 12);
 }
 
 export async function POST(req: Request) {
-  if (!isGroqConfigured()) {
+  if (!isOpenRouterConfigured()) {
     return NextResponse.json(
-      { error: "Groq API key not configured." },
+      {
+        error:
+          "OPENROUTER_API_KEY is not configured. Add it to .env.local and Vercel project settings.",
+      },
       { status: 503 },
     );
   }
@@ -201,37 +189,57 @@ export async function POST(req: Request) {
     );
   }
 
-  const peerKb = buildPeerKnowledgeBase(clientId).slice(0, 1500);
   const operatorKb = (body.knowledge_base ?? "").slice(0, 2000);
+
+  // Sanitize all evidence going outbound to OpenRouter — strips client
+  // firm names, fees, emails, phone numbers, JWTs, account-like numbers.
+  const safeEvidence = sanitizeForExternalLLM(evidence);
+  const safeOperatorKb = sanitizeForExternalLLM(operatorKb);
 
   const userPrompt = `TARGET COMPANY: ${targetName}${industry ? ` (${industry})` : ""}
 
-INTERNAL EVIDENCE CORPUS (from diligence engagement):
+INTERNAL EVIDENCE (sanitized — non-sensitive):
 """
-${evidence}
-"""
-
-INTERNAL KNOWLEDGE BASE (other engagements — use as context, not as primary peers):
-"""
-${peerKb}
+${safeEvidence}
 """
 
-${operatorKb ? `OPERATOR-SUBMITTED KNOWLEDGE BASE:\n"""\n${operatorKb}\n"""\n\n` : ""}TASK:
+${safeOperatorKb ? `OPERATOR KNOWLEDGE BASE (sanitized):\n"""\n${safeOperatorKb}\n"""\n\n` : ""}TASK:
 Use web search to identify REAL competitors / analog products of "${targetName}". Verify each peer with at least one source URL. Then produce the contextual benchmarking JSON exactly per the schema. Begin web research now and return ONLY the JSON object — no commentary.`;
 
   try {
-    const completion = await getGroqClient().chat.completions.create({
-      model: COMPOUND_MODEL,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.2,
-      max_tokens: 2500,
+    const res = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${getOpenRouterApiKey()}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "https://kaptrix.app",
+        "X-Title": "Kaptrix Positioning",
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL,
+        temperature: 0.2,
+        max_tokens: 2500,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userPrompt },
+        ],
+      }),
     });
 
-    const message = completion.choices[0]?.message;
+    const json = (await res.json()) as OpenRouterResponse;
+
+    if (!res.ok) {
+      return NextResponse.json(
+        {
+          error: `OpenRouter request failed (${res.status}): ${json.error?.message ?? "unknown error"}`,
+        },
+        { status: 502 },
+      );
+    }
+
+    const message = json.choices?.[0]?.message;
     const text = (message?.content ?? "").trim();
+
     let parsed: unknown;
     try {
       parsed = extractJson(text);
@@ -242,13 +250,13 @@ Use web search to identify REAL competitors / analog products of "${targetName}"
       );
     }
 
-    const sources = message ? extractWebSources(message) : [];
+    const sources = extractWebSources(message);
 
     return NextResponse.json({ positioning: parsed, sources });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
-      { error: `Groq request failed: ${message}` },
+      { error: `OpenRouter request failed: ${message}` },
       { status: 502 },
     );
   }
