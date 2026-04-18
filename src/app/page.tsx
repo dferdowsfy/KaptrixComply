@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Logo } from "@/components/home/logo";
 import { Reveal } from "@/components/home/reveal";
 import { TiltCard } from "@/components/home/tilt-card";
+import { PublicHeader } from "@/components/home/public-header";
 import { PlatformShowcase } from "@/components/home/platform-showcase";
 
 export const metadata: Metadata = {
@@ -70,31 +71,7 @@ const MARQUEE = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      {/* ---------- Header ---------- */}
-      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-slate-50/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <Link href="/" aria-label="KAPTRIX home">
-            <Logo wordClassName="text-lg sm:text-xl" markClassName="h-7 w-7" />
-          </Link>
-          <nav className="hidden items-center gap-10 text-base font-medium text-slate-600 sm:flex">
-            <Link
-              href="/how-it-works"
-              className="transition hover:text-slate-900"
-            >
-              How it works
-            </Link>
-            <Link href="/preview" className="transition hover:text-slate-900">
-              Platform
-            </Link>
-          </nav>
-          <Link
-            href="/login?mode=signup"
-            className="inline-flex items-center rounded-full bg-slate-900 px-6 py-3 text-base font-semibold text-white transition hover:bg-slate-800"
-          >
-            Sign up
-          </Link>
-        </div>
-      </header>
+      <PublicHeader />
 
       {/* ---------- Hero ---------- */}
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
@@ -207,11 +184,11 @@ export default function HomePage() {
             </p>
           </Reveal>
 
-          <div className="mt-14 grid gap-6 lg:grid-cols-3">
+          <div className="mt-14 grid gap-6 lg:grid-cols-3 lg:items-stretch">
             {LAYERS.map((layer, idx) => (
-              <Reveal key={layer.id} delay={idx * 120}>
+              <Reveal key={layer.id} delay={idx * 120} className="h-full">
                 <TiltCard className="h-full">
-                  <article className="group relative h-full overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-[0_1px_0_rgba(15,23,42,0.04),0_12px_40px_-24px_rgba(15,23,42,0.25)]">
+                  <article className="group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-[0_1px_0_rgba(15,23,42,0.04),0_12px_40px_-24px_rgba(15,23,42,0.25)]">
                     <div
                       aria-hidden
                       className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${layer.accent}`}

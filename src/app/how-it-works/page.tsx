@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PublicHeader } from "@/components/home/public-header";
 
 export const metadata: Metadata = {
   title: "How Kaptrix Works",
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 export default function HowItWorksPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      <PublicHeader />
       <Hero />
       <main className="mx-auto max-w-5xl px-6 py-20 space-y-24">
         <ProblemSection />
