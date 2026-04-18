@@ -167,22 +167,22 @@ export default function HomePage() {
         </div>
 
         {/* Marquee strip */}
-        <div className="marquee relative border-t border-white/10 bg-slate-950/60 py-10">
+        <div className="marquee relative border-t border-white/10 bg-slate-950/60 py-4">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-slate-950 to-transparent"
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-gradient-to-r from-slate-950 to-transparent"
           />
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-slate-950 to-transparent"
+            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-gradient-to-l from-slate-950 to-transparent"
           />
-          <div className="marquee-track text-3xl font-light uppercase tracking-[0.18em] text-slate-400 sm:text-5xl">
+          <div className="marquee-track text-xs font-medium uppercase tracking-[0.32em] text-slate-400 sm:text-sm">
             {[...MARQUEE, ...MARQUEE].map((word, i) => (
-              <span key={i} className="inline-flex items-center pr-16">
+              <span key={i} className="inline-flex items-center pr-10">
                 <span>{word}</span>
                 <span
                   aria-hidden
-                  className="ml-16 inline-block h-2 w-2 rounded-full bg-indigo-400/60"
+                  className="ml-10 inline-block h-1.5 w-1.5 rounded-full bg-indigo-400/60"
                 />
               </span>
             ))}
@@ -243,66 +243,48 @@ export default function HomePage() {
         {/* ---------- Platform snapshots ---------- */}
         <section>
           <Reveal>
-            <div className="flex flex-wrap items-end justify-between gap-6">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-violet-600">
-                  Platform snapshots
-                </p>
-                <h2 className="mt-4 max-w-3xl text-4xl font-light leading-[1.05] tracking-tight sm:text-6xl">
-                  See the product{" "}
-                  <span className="text-slate-500">in motion.</span>
-                </h2>
-              </div>
-              <Link
-                href="/preview"
-                className="inline-flex rounded-full border border-slate-300 bg-white px-5 py-3 text-base font-semibold text-slate-700 transition hover:border-slate-400"
-              >
-                Open full preview →
-              </Link>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-violet-600">
+                Platform snapshots
+              </p>
+              <h2 className="mt-4 max-w-3xl text-4xl font-light leading-[1.05] tracking-tight sm:text-6xl">
+                See the product{" "}
+                <span className="text-slate-500">in motion.</span>
+              </h2>
             </div>
           </Reveal>
 
-          <div className="mt-14 flex flex-col items-stretch gap-4 xl:flex-row xl:items-stretch">
+          <div className="mt-14 flex flex-col items-stretch gap-6">
             {SNAPSHOTS.map((shot, idx) => (
-              <div key={shot.title} className="contents xl:flex xl:flex-1">
-                <Reveal
-                  delay={idx * 140}
-                  className="xl:flex-1"
-                >
-                  <TiltCard className="h-full">
+              <div key={shot.title}>
+                <Reveal delay={idx * 120}>
+                  <TiltCard>
                     <Link
                       href={shot.href}
-                      className="relative block h-full overflow-hidden rounded-[2rem] border border-slate-800/20 bg-slate-950 p-4 text-white shadow-xl"
+                      className="relative block overflow-hidden rounded-[2rem] border border-slate-800/20 bg-slate-950 p-4 text-white shadow-xl"
                     >
                       <div
                         aria-hidden
                         className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${shot.accent}`}
                       />
-                      <div className="relative mb-4 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-200">
-                            {shot.kicker}
-                          </p>
-                          <p className="mt-1 text-lg font-semibold">
-                            {shot.title}
-                          </p>
-                        </div>
-                        <span className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-slate-200">
-                          Live →
-                        </span>
+                      <div className="relative mb-4 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-200">
+                          {shot.kicker}
+                        </p>
+                        <p className="mt-1 text-lg font-semibold">
+                          {shot.title}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-slate-300">
+                          {shot.description}
+                        </p>
                       </div>
-                      <p className="relative mb-4 text-sm leading-6 text-slate-300">
-                        {shot.description}
-                      </p>
-                      <div className="relative h-[26rem] overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
-                        <div className="absolute left-0 top-0 origin-top-left scale-[0.62]">
-                          <iframe
-                            title={shot.title}
-                            src={shot.href}
-                            className="h-[960px] w-[1440px] border-0"
-                            loading="lazy"
-                          />
-                        </div>
+                      <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
+                        <iframe
+                          title={shot.title}
+                          src={shot.href}
+                          className="absolute inset-0 h-full w-full border-0"
+                          loading="lazy"
+                        />
                       </div>
                     </Link>
                   </TiltCard>
@@ -310,11 +292,11 @@ export default function HomePage() {
                 {idx < SNAPSHOTS.length - 1 && (
                   <div
                     aria-hidden
-                    className="flow-arrow flex items-center justify-center py-3 xl:py-0 xl:px-1"
+                    className="flow-arrow flex items-center justify-center py-4"
                   >
                     <svg
-                      viewBox="0 0 80 24"
-                      className="h-6 w-16 rotate-90 text-indigo-400 xl:h-7 xl:w-20 xl:rotate-0"
+                      viewBox="0 0 24 80"
+                      className="h-16 w-6 text-indigo-400"
                       fill="none"
                     >
                       <defs>
@@ -322,15 +304,15 @@ export default function HomePage() {
                           id={`arrow-grad-${idx}`}
                           x1="0"
                           y1="0"
-                          x2="1"
-                          y2="0"
+                          x2="0"
+                          y2="1"
                         >
                           <stop offset="0%" stopColor="#818cf8" />
                           <stop offset="100%" stopColor="#e879f9" />
                         </linearGradient>
                       </defs>
                       <path
-                        d="M4 12 H70"
+                        d="M12 4 V70"
                         stroke={`url(#arrow-grad-${idx})`}
                         strokeWidth="2"
                         strokeLinecap="round"
@@ -338,7 +320,7 @@ export default function HomePage() {
                         className="flow-arrow-dash"
                       />
                       <path
-                        d="M62 5 L74 12 L62 19"
+                        d="M5 62 L12 74 L19 62"
                         stroke={`url(#arrow-grad-${idx})`}
                         strokeWidth="2"
                         strokeLinecap="round"
