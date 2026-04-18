@@ -17,7 +17,7 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="print-hide border-b bg-white/95 backdrop-blur">
+      <div className="print-hide relative z-50 border-b bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-600 sm:text-[11px]">
