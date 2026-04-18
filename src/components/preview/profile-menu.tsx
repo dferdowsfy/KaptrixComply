@@ -79,7 +79,7 @@ export function ProfileMenu() {
     .padEnd(1, "·");
 
   return (
-    <div ref={menuRef} className="relative">
+    <div ref={menuRef} className="relative z-50">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
