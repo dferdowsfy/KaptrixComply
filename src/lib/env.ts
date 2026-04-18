@@ -41,3 +41,26 @@ export function isOpenRouterConfigured(): boolean {
 export function getOpenRouterApiKey(): string {
   return getServerEnv("OPENROUTER_API_KEY");
 }
+
+export interface OpenRouterEnvDebugInfo {
+  configured: boolean;
+  present: boolean;
+  length: number;
+  placeholderDetected: boolean;
+  matchingEnvKeys: string[];
+}
+
+export function getOpenRouterEnvDebugInfo(): OpenRouterEnvDebugInfo {
+  const key = getOpenRouterApiKey();
+  const matchingEnvKeys = Object.keys(process.env)
+    .filter((name) => name.toUpperCase().includes("OPENROUTER"))
+    .sort();
+
+  return {
+    configured: isOpenRouterConfigured(),
+    present: key.length > 0,
+    length: key.length,
+    placeholderDetected: isPlaceholder(key),
+    matchingEnvKeys,
+  };
+}
