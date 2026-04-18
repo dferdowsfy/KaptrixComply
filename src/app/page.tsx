@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Logo } from "@/components/home/logo";
 import { Reveal } from "@/components/home/reveal";
 import { TiltCard } from "@/components/home/tilt-card";
+import { PlatformShowcase } from "@/components/home/platform-showcase";
 
 export const metadata: Metadata = {
   title: "KAPTRIX | AI Diligence Platform",
@@ -251,88 +252,14 @@ export default function HomePage() {
                 See the product{" "}
                 <span className="text-slate-500">in motion.</span>
               </h2>
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
+                Step through each layer of the platform. The preview advances
+                on its own, or jump to a layer from the stepper.
+              </p>
             </div>
           </Reveal>
 
-          <div className="mt-14 flex flex-col items-stretch gap-6">
-            {SNAPSHOTS.map((shot, idx) => (
-              <div key={shot.title}>
-                <Reveal delay={idx * 120}>
-                  <TiltCard>
-                    <Link
-                      href={shot.href}
-                      className="relative block overflow-hidden rounded-[2rem] border border-slate-800/20 bg-slate-950 p-4 text-white shadow-xl"
-                    >
-                      <div
-                        aria-hidden
-                        className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${shot.accent}`}
-                      />
-                      <div className="relative mb-4 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-200">
-                          {shot.kicker}
-                        </p>
-                        <p className="mt-1 text-lg font-semibold">
-                          {shot.title}
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-slate-300">
-                          {shot.description}
-                        </p>
-                      </div>
-                      <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
-                        <iframe
-                          title={shot.title}
-                          src={shot.href}
-                          className="absolute inset-0 h-full w-full border-0"
-                          loading="lazy"
-                        />
-                      </div>
-                    </Link>
-                  </TiltCard>
-                </Reveal>
-                {idx < SNAPSHOTS.length - 1 && (
-                  <div
-                    aria-hidden
-                    className="flow-arrow flex items-center justify-center py-4"
-                  >
-                    <svg
-                      viewBox="0 0 24 80"
-                      className="h-16 w-6 text-indigo-400"
-                      fill="none"
-                    >
-                      <defs>
-                        <linearGradient
-                          id={`arrow-grad-${idx}`}
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop offset="0%" stopColor="#818cf8" />
-                          <stop offset="100%" stopColor="#e879f9" />
-                        </linearGradient>
-                      </defs>
-                      <path
-                        d="M12 4 V70"
-                        stroke={`url(#arrow-grad-${idx})`}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeDasharray="4 6"
-                        className="flow-arrow-dash"
-                      />
-                      <path
-                        d="M5 62 L12 74 L19 62"
-                        stroke={`url(#arrow-grad-${idx})`}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        fill="none"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+          <PlatformShowcase steps={SNAPSHOTS} />
         </section>
 
         {/* ---------- Simple access ---------- */}
