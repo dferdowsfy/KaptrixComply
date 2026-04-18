@@ -158,13 +158,11 @@ function LoginForm() {
         </button>
       </p>
 
-      {!isSignUp && (
-        <p className="text-center text-sm text-gray-600">
-          <Link href="/forgot-password" className="font-medium text-gray-900 hover:underline">
-            Forgot password?
-          </Link>
-        </p>
-      )}
+      <p className="text-center text-sm text-gray-600">
+        <Link href="/forgot-password" className="font-medium text-gray-900 hover:underline">
+          Forgot password?
+        </Link>
+      </p>
 
       {message && (
         <p className="text-center text-sm text-gray-600">{message}</p>
