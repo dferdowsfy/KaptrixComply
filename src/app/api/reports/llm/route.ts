@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getGroqClient, MODELS } from "@/lib/anthropic/client";
-import { isGroqConfigured } from "@/lib/env";
+import { isOpenRouterConfigured, getOpenRouterApiKey } from "@/lib/env";
 import { getPreviewSnapshot } from "@/lib/preview/data";
 import {
   getAdvancedReportConfig,
@@ -106,11 +105,11 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!isGroqConfigured()) {
+  if (!isOpenRouterConfigured()) {
     return NextResponse.json(
       {
         error:
-          "Groq API key is not configured. Set GROQ_API_KEY in .env.local or Vercel Project Settings to enable report generation.",
+          "OpenRouter API key is not configured. Set OPENROUTER_API_KEY in .env.local or Vercel Project Settings to enable report generation.",
       },
       { status: 503 },
     );
@@ -154,16 +153,39 @@ ${combinedEvidence}
 Return the report as clean markdown only. No preamble, no closing remarks, no code fences.`;
 
   try {
-    const groq = getGroqClient();
-    const completion = await groq.chat.completions.create({
-      model: MODELS.SYNTHESIS,
-      messages: [
-        { role: "system", content: config.systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: 8192,
-      temperature: 0.2,
-    });
+    const openRouterRes = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getOpenRouterApiKey()}`,
+          "HTTP-Referer": "https://kaptrix.ai",
+          "X-Title": "Kaptrix AI Diligence",
+        },
+        body: JSON.stringify({
+          model: "perplexity/sonar-deep-research",
+          messages: [
+            { role: "system", content: config.systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: 8192,
+          temperature: 0.2,
+        }),
+      },
+    );
+
+    if (!openRouterRes.ok) {
+      const errText = await openRouterRes.text();
+      return NextResponse.json(
+        { error: `OpenRouter error ${openRouterRes.status}: ${errText}` },
+        { status: 502 },
+      );
+    }
+
+    const completion = (await openRouterRes.json()) as {
+      choices: Array<{ message: { content: string } }>;
+    };
 
     const content = (completion.choices[0]?.message?.content ?? "").trim();
     if (!content) {
