@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import { useNavVisibility } from "@/hooks/use-nav-visibility";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -16,24 +15,6 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
   const { client, ready } = useSelectedPreviewClient();
   const { visibleTabs } = useNavVisibility();
   const isHome = pathname === "/preview";
-  const navRef = useRef<HTMLElement | null>(null);
-  const activeTabRef = useRef<HTMLAnchorElement | null>(null);
-
-  useEffect(() => {
-    const el = activeTabRef.current;
-    const nav = navRef.current;
-    if (!el || !nav) return;
-    // Bring the active tab fully into view within the horizontal nav
-    const elRect = el.getBoundingClientRect();
-    const navRect = nav.getBoundingClientRect();
-    if (elRect.right > navRect.right || elRect.left < navRect.left) {
-      el.scrollIntoView({
-        behavior: "smooth",
-        inline: "end",
-        block: "nearest",
-      });
-    }
-  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -91,9 +72,9 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="print-hide sticky top-0 z-40 border-b bg-white/95 shadow-sm backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 sm:px-6">
-          <nav ref={navRef} className="flex-1 overflow-x-auto">
-            <ul className="flex min-w-max items-center gap-1.5 py-2 sm:gap-2 sm:py-3">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2 sm:flex-row sm:items-center sm:gap-3 sm:px-6 sm:py-3">
+          <nav className="min-w-0 flex-1">
+            <ul className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               {visibleTabs.map((tab) => {
                 const isActive =
                   tab.href === "/preview"
@@ -102,12 +83,11 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
                 return (
                   <li key={tab.id}>
                     <Link
-                      ref={isActive ? activeTabRef : undefined}
                       href={tab.href}
-                      className={`inline-flex rounded-full px-3 py-1.5 text-sm font-medium transition sm:px-4 sm:py-2 sm:text-base ${
+                      className={`inline-flex whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition ${
                         isActive
-                          ? "bg-slate-900 text-white"
-                          : "border border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900"
+                          ? "bg-slate-900 text-white shadow-sm"
+                          : "border border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900"
                       }`}
                     >
                       {tab.label}
@@ -117,7 +97,7 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
               })}
             </ul>
           </nav>
-          <div className="flex shrink-0 items-center gap-2 py-2 sm:py-3">
+          <div className="flex shrink-0 items-center gap-2">
             <Link
               href="/how-it-works"
               className="group relative hidden items-center rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-indigo-700 transition sm:inline-flex"
