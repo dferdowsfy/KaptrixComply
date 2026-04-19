@@ -161,9 +161,10 @@ Return the report as clean markdown only. No preamble, no closing remarks, no co
       ],
       temperature: 0.2,
       // Self-hosted CPU inference on the VPS tops out around 5-13 tok/s,
-      // so ~2500 output tokens is the realistic ceiling inside Vercel
-      // Pro's 300s function timeout. Prompts are tuned to be tight.
-      maxTokens: 2500,
+      // so ~2000 output tokens is the realistic ceiling inside Vercel
+      // Pro's 300s function timeout. Prompts tell the model to target
+      // ~1800 tokens and finish cleanly inside the budget.
+      maxTokens: 2000,
     });
 
     if (!content) {

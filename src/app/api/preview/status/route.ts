@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase/service";
-import { isGroqConfigured } from "@/lib/env";
+import { isSelfHostedLlmConfigured } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,11 +20,13 @@ export async function GET() {
     // supabaseOk stays false
   }
 
-  // Check Groq key presence
-  const groqOk = isGroqConfigured();
+  // Check self-hosted LLM (Ollama) configuration presence
+  const llmOk = isSelfHostedLlmConfigured();
 
   return NextResponse.json({
     supabase: supabaseOk,
-    groq: groqOk,
+    llm: llmOk,
+    // keep legacy key so any UI reading `groq` still works until migrated
+    groq: llmOk,
   });
 }

@@ -32,7 +32,8 @@ const FORMAT_RULES = `Output format: clean GitHub-flavored markdown.
 - Tag severity or status inline using bracketed tokens so the UI can color-code them: [CRITICAL], [HIGH], [MEDIUM], [LOW], [OK], [STRENGTH], [RISK], [GAP]. Example: "| Tenancy boundary [HIGH] | ... |".
 - Use '> ' blockquotes for key insights, partner-level takeaways, or callouts the reader should not miss.
 - Use '---' as a horizontal rule between major sections when it aids scanability.
-- Do NOT wrap the entire output in code fences. Do NOT include a preamble or closing remarks — return the report only.`;
+- Do NOT wrap the entire output in code fences. Do NOT include a preamble or closing remarks — return the report only.
+- LENGTH BUDGET: aim for ~1800 output tokens total (roughly 3 dense pages). Be tight — prefer tables and bullet lists over prose. Cover every required section but do NOT pad. Finish cleanly within the budget.`;
 
 // Every report MUST begin with a standardized "decision snapshot"
 // hero block so the reader sees the bottom-line verdict before

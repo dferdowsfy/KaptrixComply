@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGroqClient, MODELS } from "@/lib/anthropic/client";
-import { isGroqConfigured } from "@/lib/env";
+import { llmChat } from "@/lib/llm/client";
+import { isSelfHostedLlmConfigured, getSelfHostedLlmModel } from "@/lib/env";
 import { SCORING_DIMENSIONS } from "@/lib/constants";
 import {
   SCORING_GUIDANCE_SYSTEM_PROMPT,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/anthropic/prompts/scoring-guidance";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 interface Body {
   dimension: string;
@@ -49,9 +50,9 @@ function isGuidance(value: unknown): value is ScoringGuidance {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isGroqConfigured()) {
+  if (!isSelfHostedLlmConfigured()) {
     return NextResponse.json(
-      { error: "Scoring copilot is not configured (missing Groq API key)." },
+      { error: "Scoring copilot is not configured (self-hosted LLM missing)." },
       { status: 503 },
     );
   }
@@ -105,13 +106,13 @@ export async function POST(request: NextRequest) {
   const prompt = `${SCORING_GUIDANCE_SYSTEM_PROMPT}\n\n${userPrompt}`;
 
   try {
-    const completion = await getGroqClient().chat.completions.create({
-      model: MODELS.PRE_ANALYSIS,
+    const completion = await llmChat({
       messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
       temperature: 0.1,
+      maxTokens: 800,
+      jsonMode: true,
     });
-    const text = (completion.choices[0]?.message?.content ?? "").trim();
+    const text = (completion.content ?? "").trim();
 
     let parsed: unknown;
     try {
@@ -136,14 +137,14 @@ export async function POST(request: NextRequest) {
         dimension,
         sub_criterion,
         score,
-        model: MODELS.PRE_ANALYSIS,
+        model: getSelfHostedLlmModel(),
         prompt_version: "scoring-guidance@1.0.0",
       },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
-      { error: `Groq request failed: ${message}` },
+      { error: `LLM request failed: ${message}` },
       { status: 502 },
     );
   }

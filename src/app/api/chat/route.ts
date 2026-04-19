@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { getGroqClient, MODELS } from "@/lib/anthropic/client";
-import { isGroqConfigured } from "@/lib/env";
+import { llmChat } from "@/lib/llm/client";
+import { isSelfHostedLlmConfigured, getSelfHostedLlmModel } from "@/lib/env";
 import { getServiceClient } from "@/lib/supabase/service";
 import { getPreviewSnapshot } from "@/lib/preview/data";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 type ChatTurn = { role: "user" | "assistant"; text: string };
 
@@ -135,7 +136,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!isGroqConfigured()) {
+  if (!isSelfHostedLlmConfigured()) {
     await persistTurn({
       session_id: sessionId,
       client_id: clientId,
@@ -145,7 +146,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Groq API key is not configured. Set GROQ_API_KEY in .env.local or Vercel Project Settings to enable the chatbot.",
+          "Self-hosted LLM is not configured. Set SELF_HOSTED_LLM_BASE_URL and SELF_HOSTED_LLM_MODEL in .env.local or Vercel to enable the chatbot.",
       },
       { status: 503 },
     );
@@ -176,46 +177,42 @@ Answer:`;
   });
 
   try {
-    const groq = getGroqClient();
-
-    // Run answer + follow-up suggestion generation in parallel
-    const [completion, suggestionsResp] = await Promise.all([
-      groq.chat.completions.create({
-        model: MODELS.PRE_ANALYSIS,
+    // Run answer + follow-up suggestions in parallel via the unified
+    // self-hosted LLM client. Suggestions are best-effort.
+    const [answerResp, suggestionsResp] = await Promise.all([
+      llmChat({
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 1024,
         temperature: 0.3,
+        maxTokens: 800,
       }),
-      groq.chat.completions
-        .create({
-          model: MODELS.PRE_ANALYSIS,
-          messages: [
-            {
-              role: "user",
-              content: `You are generating follow-up question suggestions for a diligence chat. Based on the user's question and the available evidence, return exactly 3 short, specific follow-up questions a diligence analyst might ask next. Keep each under 8 words. Return JSON only: {"suggestions":["q1","q2","q3"]}.
+      llmChat({
+        messages: [
+          {
+            role: "user",
+            content: `You are generating follow-up question suggestions for a diligence chat. Based on the user's question and the available evidence, return exactly 3 short, specific follow-up questions a diligence analyst might ask next. Keep each under 8 words. Return JSON only: {"suggestions":["q1","q2","q3"]}.
 
 EVIDENCE SNIPPET:
-${context.slice(0, 6000)}
+${context.slice(0, 4000)}
 
 USER JUST ASKED: ${question}
 
 JSON:`,
-            },
-          ],
-          max_tokens: 200,
-          temperature: 0.7,
-          response_format: { type: "json_object" },
-        })
-        .catch(() => null),
+          },
+        ],
+        temperature: 0.7,
+        maxTokens: 200,
+        jsonMode: true,
+      }).catch(() => null),
     ]);
 
-    const answer = (completion.choices[0]?.message?.content ?? "").trim();
+    const answer = (answerResp.content ?? "").trim();
 
     let suggestions: string[] = [];
-    if (suggestionsResp) {
+    if (suggestionsResp?.content) {
       try {
-        const raw = suggestionsResp.choices[0]?.message?.content ?? "{}";
-        const parsed = JSON.parse(raw) as { suggestions?: unknown };
+        const parsed = JSON.parse(suggestionsResp.content) as {
+          suggestions?: unknown;
+        };
         if (Array.isArray(parsed.suggestions)) {
           suggestions = parsed.suggestions
             .filter((s): s is string => typeof s === "string")
@@ -233,7 +230,7 @@ JSON:`,
       client_id: clientId,
       role: "assistant",
       content: answer,
-      metadata: { model: MODELS.PRE_ANALYSIS },
+      metadata: { model: getSelfHostedLlmModel() },
     });
 
     return NextResponse.json({ answer, suggestions });
@@ -247,7 +244,7 @@ JSON:`,
       metadata: { error: true },
     });
     return NextResponse.json(
-      { error: `Groq request failed: ${message}` },
+      { error: `LLM request failed: ${message}` },
       { status: 502 },
     );
   }

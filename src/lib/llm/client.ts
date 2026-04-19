@@ -63,7 +63,7 @@ export async function llmChat(opts: LlmChatOptions): Promise<LlmChatResult> {
     model,
     messages: opts.messages,
     temperature: opts.temperature ?? 0.2,
-    max_tokens: opts.maxTokens ?? 8192,
+    max_tokens: opts.maxTokens ?? 2000,
     stream: false,
   };
   if (opts.jsonMode) {
