@@ -55,7 +55,6 @@ export async function llmChat(opts: LlmChatOptions): Promise<LlmChatResult> {
     "Content-Type": "application/json",
   };
   if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
     headers["X-API-Key"] = apiKey;
   }
 
