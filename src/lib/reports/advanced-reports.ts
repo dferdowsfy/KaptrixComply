@@ -10,6 +10,18 @@ export type AdvancedReportId =
   | "value_creation"
   | "evidence_coverage";
 
+export interface AdvancedReportSection {
+  /** Stable id used by the API + client orchestrator. */
+  id: string;
+  /** Human label shown in progress UI ("Critical Findings"). */
+  label: string;
+  /** Focused prompt appended to the shared systemPrompt for this slice. */
+  instruction: string;
+  /** Target output tokens for THIS section. Kept modest to stay inside
+   *  the Vercel Pro 300s function timeout on CPU inference. */
+  maxTokens: number;
+}
+
 export interface AdvancedReportConfig {
   id: AdvancedReportId;
   title: string;
@@ -19,6 +31,12 @@ export interface AdvancedReportConfig {
   eyebrow: string;
   systemPrompt: string;
   userPromptIntro: string;
+  /** Optional section breakdown for streamed multi-call generation.
+   *  When present, the client orchestrator makes one LLM call per
+   *  section and concatenates the markdown. Lets us produce deep,
+   *  10-page-scale reports without any single call approaching the
+   *  Vercel function timeout. */
+  sections?: AdvancedReportSection[];
 }
 
 const FORMAT_RULES = `Output format: clean GitHub-flavored markdown.
@@ -285,6 +303,82 @@ ${DECISION_SNAPSHOT_RULE}
 
 For the snapshot: "verdict" summarizes whether the diligence is decision-ready (e.g. "Decision-Ready", "Directional Only — Material Gaps", "Not Reliable for IC"). "posture" reflects evidence quality (HIGH if many gaps, OK if strong). "confidence" is the overall reliability score 0-100. "thesis" is one sentence on whether this diligence can be trusted. Use "strengths" for well-evidenced dimensions and "risks" for the biggest evidence gaps (tagged [GAP] or [HIGH]).`;
 
+// ------------------------------------------------------------------
+// SECTION BREAKDOWNS
+// Each report is split into focused slices. One LLM call per section
+// keeps every request well under Vercel Pro's 300s function timeout
+// on CPU-only Ollama inference (~5-13 tok/s) while still producing
+// reports that add up to ~8-10k tokens of dense content.
+//
+// IMPORTANT: The FIRST section of every report must emit the
+// ':::snapshot' hero block. All subsequent sections produce only
+// their own markdown — no duplicate title, no preamble.
+// ------------------------------------------------------------------
+
+const SECTION_SNAPSHOT_INSTRUCTION = `OUTPUT ONLY the ':::snapshot' hero block (and the '#' report title immediately after it). Nothing else. No preamble. No later sections. Stop after the title line.`;
+
+function sectionBodyInstruction(headingMarkdown: string, guidance: string, additional?: string): string {
+  return [
+    `OUTPUT ONLY the markdown for the "${headingMarkdown}" section. Begin your response with that exact heading line and go directly into the content. Do NOT repeat earlier sections. Do NOT re-emit the ':::snapshot' block or '#' title. Do NOT write a closing remark.`,
+    guidance,
+    additional ?? "",
+    `Keep paragraphs tight (≤ 90 words). Use bullet lists and tables where appropriate. Finish cleanly inside the token budget.`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+const MASTER_SECTIONS: AdvancedReportSection[] = [
+  { id: "snapshot", label: "Decision snapshot", maxTokens: 500, instruction: SECTION_SNAPSHOT_INSTRUCTION },
+  { id: "architecture", label: "System & architecture reality", maxTokens: 1100, instruction: sectionBodyInstruction("## 1. System & AI Architecture Reality", "Describe actual system design vs marketing claims. Identify where AI is truly used vs implied. Call out mismatches between stated and observed architecture. Cite evidence specifically.") },
+  { id: "credibility", label: "Product credibility breakdown", maxTokens: 1100, instruction: sectionBodyInstruction("## 2. Product Credibility Breakdown", "Score-backed analysis of whether AI drives value or is superficial. Identify demo-quality vs production-reality gaps. Reference specific artifacts or note missing proof.") },
+  { id: "data", label: "Data advantage vs illusion", maxTokens: 900, instruction: sectionBodyInstruction("## 3. Data Advantage vs Illusion", "Classify data as (a) proprietary and compounding, (b) operational but replaceable, or (c) commoditized. Justify with evidence.") },
+  { id: "vendor", label: "Vendor & model dependency risk", maxTokens: 900, instruction: sectionBodyInstruction("## 4. Vendor & Model Dependency Risk", "Quantify reliance on specific providers. Identify switching friction, margin risk, and hidden dependencies. Use a table if listing multiple vendors.") },
+  { id: "failure_modes", label: "Failure mode analysis", maxTokens: 1100, instruction: sectionBodyInstruction("## 5. Failure Mode Analysis", "Identify the TOP 3 ways this system breaks in production. For each: trigger, technical failure point, business impact, whether mitigation exists. Use a table.") },
+  { id: "governance", label: "Governance stress test", maxTokens: 900, instruction: sectionBodyInstruction("## 6. Governance Stress Test", "Do not describe controls — TEST them. Where would controls fail under edge cases? Is auditability real or superficial?") },
+  { id: "production", label: "Production reality check", maxTokens: 900, instruction: sectionBodyInstruction("## 7. Production Reality Check", "Can this scale? Where will cost explode? Where will reliability fail? Be specific.") },
+  { id: "scores", label: "Score decomposition", maxTokens: 1100, instruction: sectionBodyInstruction("## 8. Score Decomposition", "For each dimension: score, why it earned that score, what would need to change for +1 point. Render scores as bullets in the exact form 'Label: X.X / 5'.") },
+  { id: "impact", label: "Investment impact", maxTokens: 900, instruction: sectionBodyInstruction("## 9. So What — Investment Impact", "Translate findings into: what breaks the business, what limits scale, what reduces exit multiple.") },
+  { id: "gaps", label: "Evidence gaps", maxTokens: 700, instruction: sectionBodyInstruction("## 10. Evidence Gaps", "List missing artifacts that materially impact confidence. Label affected sections as [LOW CONFIDENCE] where applicable.") },
+];
+
+const IC_MEMO_SECTIONS: AdvancedReportSection[] = [
+  { id: "snapshot", label: "Decision snapshot", maxTokens: 500, instruction: SECTION_SNAPSHOT_INSTRUCTION },
+  { id: "recommendation", label: "Final recommendation", maxTokens: 600, instruction: sectionBodyInstruction("## 1. Final Recommendation", "State one of: Invest / Proceed with Conditions / High Risk / Do Not Proceed. Give a confidence score 0-100%. One sentence: 'This deal works / breaks because…'.") },
+  { id: "insight", label: "Non-obvious insight", maxTokens: 600, instruction: sectionBodyInstruction("## 2. Non-Obvious Insight", "What is true about this company that is NOT obvious from a surface review? Be specific and defensible.") },
+  { id: "strengths", label: "Critical strengths", maxTokens: 800, instruction: sectionBodyInstruction("## 3. Three Critical Strengths", "List the 3 strengths most defensible and tied to value creation or defensibility. Use bullets with one-line rationale each.") },
+  { id: "risks", label: "Critical risks", maxTokens: 900, instruction: sectionBodyInstruction("## 4. Three Critical Risks", "List the 3 risks that could realistically break the investment. Use a markdown table with Risk | Severity | Why It Matters | Evidence.") },
+  { id: "killer", label: "What would kill this deal", maxTokens: 500, instruction: sectionBodyInstruction("## 5. What Would Kill This Deal", "The single biggest failure point. One paragraph.") },
+  { id: "double", label: "What would 2x value", maxTokens: 500, instruction: sectionBodyInstruction("## 6. What Would 2x the Value", "The most leveraged improvement opportunity. One paragraph.") },
+  { id: "implications", label: "Deal implications", maxTokens: 700, instruction: sectionBodyInstruction("## 7. Deal Implications", "Impact on valuation (overvalued / fair / undervalued based on AI reality), scalability constraints, exit risk.") },
+];
+
+const RISK_REGISTER_SECTIONS: AdvancedReportSection[] = [
+  { id: "snapshot", label: "Decision snapshot", maxTokens: 500, instruction: SECTION_SNAPSHOT_INSTRUCTION },
+  { id: "critical", label: "Critical & high risks (R1–R5)", maxTokens: 1800, instruction: sectionBodyInstruction("# Technical Risk Register", "Emit the top 5 risks as '## R1. Title' through '## R5. Title'. For each include: System Area, Description, Trigger Condition, Evidence, Severity (justify), Likelihood (justify), Business Impact, Mitigation (actionable), Residual Risk. Order highest-severity first.") },
+  { id: "medium", label: "Medium residual risks (R6–R10)", maxTokens: 1600, instruction: sectionBodyInstruction("<!-- continuing risk register -->", "Emit 5 more risks as '## R6. Title' through '## R10. Title' with the same field set. Skip the '# Technical Risk Register' header — do not repeat it.") },
+  { id: "long_tail", label: "Long-tail risks (R11–R15)", maxTokens: 1400, instruction: sectionBodyInstruction("<!-- continuing risk register -->", "Emit up to 5 lower-severity but still real risks as '## R11. Title' onward. Skip if fewer than 5 material additional risks exist — explain why briefly.") },
+];
+
+const VALUE_CREATION_SECTIONS: AdvancedReportSection[] = [
+  { id: "snapshot", label: "Decision snapshot", maxTokens: 500, instruction: SECTION_SNAPSHOT_INSTRUCTION },
+  { id: "actions", label: "Top 7 actions (ranked)", maxTokens: 1800, instruction: sectionBodyInstruction("## 1. Top 7 Actions (Ranked)", "For each of 7 actions: what exactly to do, what problem it fixes, why it matters economically. Tie each directly to a risk or missed opportunity.") },
+  { id: "leverage", label: "Value leverage & cost reduction", maxTokens: 1000, instruction: sectionBodyInstruction("## 2. Value Leverage & Cost Reduction", "Subsections '### Value Leverage' (which 2 actions create disproportionate value?) and '### Cost Reduction Opportunities' (where can AI costs be reduced or optimized?).") },
+  { id: "risk_reduction", label: "Risk reduction moves", maxTokens: 800, instruction: sectionBodyInstruction("## 3. Risk Reduction Moves", "Which actions materially reduce catastrophic failure risk? Be specific.") },
+  { id: "plan", label: "30 / 60 / 90 execution plan", maxTokens: 1400, instruction: sectionBodyInstruction("## 4. 30 / 60 / 90 Execution Plan", "Use '### 0-30 Days', '### 31-60 Days', '### 61-90 Days'. For each phase: owners (engineering, product, ops) and deliverables.") },
+  { id: "metrics", label: "Measurable outcomes", maxTokens: 700, instruction: sectionBodyInstruction("## 5. Measurable Outcomes", "Define success in metrics (cost ↓ %, latency ↓, accuracy ↑, etc.). Use a table with Metric | Baseline | Target | Timeline.") },
+];
+
+const COVERAGE_SECTIONS: AdvancedReportSection[] = [
+  { id: "snapshot", label: "Decision snapshot", maxTokens: 500, instruction: SECTION_SNAPSHOT_INSTRUCTION },
+  { id: "inventory", label: "Artifact inventory", maxTokens: 900, instruction: sectionBodyInstruction("## 1. Artifact Inventory", "List artifacts actually analyzed (use real filenames/categories from the evidence). Categorize into Product, Data, Infra, Governance. Use a table.") },
+  { id: "coverage", label: "Coverage by dimension", maxTokens: 1600, instruction: sectionBodyInstruction("## 2. Coverage by Dimension", "For each scoring dimension (Product Credibility, Tooling Exposure, Data Sensitivity, Governance & Safety, Production Readiness, Open Validation): Evidence present (specific), Evidence missing, Coverage rating (High/Medium/Low).") },
+  { id: "confidence", label: "Confidence scoring", maxTokens: 900, instruction: sectionBodyInstruction("## 3. Confidence Scoring", "Assign confidence (0-100%) to each dimension score and justify based on evidence strength. Use a table.") },
+  { id: "unsupported", label: "Unsupported conclusions", maxTokens: 800, instruction: sectionBodyInstruction("## 4. Unsupported Conclusions", "Identify where conclusions rely on weak or indirect evidence. Be specific and critical.") },
+  { id: "gaps", label: "Critical gaps", maxTokens: 800, instruction: sectionBodyInstruction("## 5. Critical Gaps", "What missing artifacts would most change the outcome? Rank by impact.") },
+  { id: "reliability", label: "Overall reliability", maxTokens: 700, instruction: sectionBodyInstruction("## 6. Overall Reliability", "Can this diligence be trusted for an investment decision? Why or why not? One clear verdict.") },
+];
+
 export const ADVANCED_REPORTS: AdvancedReportConfig[] = [
   {
     id: "master_diligence",
@@ -297,6 +391,7 @@ export const ADVANCED_REPORTS: AdvancedReportConfig[] = [
     systemPrompt: MASTER_PROMPT,
     userPromptIntro:
       "Produce the Master AI Diligence Report for the target company below.",
+    sections: MASTER_SECTIONS,
   },
   {
     id: "ic_memo",
@@ -309,6 +404,7 @@ export const ADVANCED_REPORTS: AdvancedReportConfig[] = [
     systemPrompt: IC_MEMO_PROMPT,
     userPromptIntro:
       "Write the Investment Committee memo for the target company below.",
+    sections: IC_MEMO_SECTIONS,
   },
   {
     id: "risk_register",
@@ -321,6 +417,7 @@ export const ADVANCED_REPORTS: AdvancedReportConfig[] = [
     systemPrompt: RISK_REGISTER_PROMPT,
     userPromptIntro:
       "Produce the Technical Risk Register for the target company below.",
+    sections: RISK_REGISTER_SECTIONS,
   },
   {
     id: "value_creation",
@@ -333,6 +430,7 @@ export const ADVANCED_REPORTS: AdvancedReportConfig[] = [
     systemPrompt: VALUE_CREATION_PROMPT,
     userPromptIntro:
       "Produce the Value Creation / 100-Day execution plan for the target company below.",
+    sections: VALUE_CREATION_SECTIONS,
   },
   {
     id: "evidence_coverage",
@@ -345,6 +443,7 @@ export const ADVANCED_REPORTS: AdvancedReportConfig[] = [
     systemPrompt: COVERAGE_PROMPT,
     userPromptIntro:
       "Produce the Evidence / Artifact Coverage Report for the target company below.",
+    sections: COVERAGE_SECTIONS,
   },
 ];
 

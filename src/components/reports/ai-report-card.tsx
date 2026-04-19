@@ -160,9 +160,30 @@ export function AiReportCard({
 
         {loading && !result && (
           <div className="mt-4 overflow-hidden rounded-lg bg-indigo-50">
-            <div className="h-1.5 w-full animate-report-progress bg-gradient-to-r from-indigo-300 via-indigo-500 to-violet-500" />
+            {record?.sectionsTotal && record.sectionsTotal > 0 ? (
+              <div
+                className="h-1.5 bg-gradient-to-r from-indigo-400 via-indigo-500 to-violet-500 transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, Math.round(((record.sectionsDone ?? 0) / record.sectionsTotal) * 100))}%`,
+                }}
+              />
+            ) : (
+              <div className="h-1.5 w-full animate-report-progress bg-gradient-to-r from-indigo-300 via-indigo-500 to-violet-500" />
+            )}
           </div>
         )}
+        {loading && !result && record?.sectionsTotal ? (
+          <div className="mt-2 flex items-center justify-between text-[11px] font-medium text-indigo-700">
+            <span>
+              Section {Math.min((record.sectionsDone ?? 0) + 1, record.sectionsTotal)} of{" "}
+              {record.sectionsTotal}
+              {record.currentSection ? ` · ${record.currentSection}` : ""}
+            </span>
+            <span className="text-slate-500">
+              Each section runs ~30-90s on CPU inference
+            </span>
+          </div>
+        ) : null}
         {loading && !result && (
           <div className="mt-3 space-y-2">
             <div className="h-3 w-1/3 animate-pulse rounded bg-slate-200" />

@@ -1,7 +1,10 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { AdvancedReportId } from "@/lib/reports/advanced-reports";
+import {
+  getAdvancedReportConfig,
+  type AdvancedReportId,
+} from "@/lib/reports/advanced-reports";
 
 // ------------------------------------------------------------------
 // Global, per-browser report generation store.
@@ -34,6 +37,11 @@ export interface ReportRecord {
   generated_at?: string; // ISO string
   started_at?: string; // ISO string
   error?: string;
+  /** Multi-section generation progress (absent for legacy single-call reports). */
+  sectionsTotal?: number;
+  sectionsDone?: number;
+  /** Label of the section currently being generated, if any. */
+  currentSection?: string;
 }
 
 // Key helper: each (client, reportId) is unique.
@@ -288,6 +296,128 @@ export function startGeneration(args: StartArgs): void {
 }
 
 async function runGeneration(args: StartArgs): Promise<void> {
+  const config = getAdvancedReportConfig(args.reportId);
+  const sections = config?.sections;
+
+  // ---------- NEW: multi-section streamed generation ----------
+  if (sections && sections.length > 0) {
+    let accumulated = "";
+    const total = sections.length;
+    const client = getReport(args.clientId, args.reportId)?.client ?? "";
+    let targetName = args.target;
+
+    // Initialize progress on the record up-front.
+    setRecord({
+      reportId: args.reportId,
+      clientId: args.clientId,
+      target: args.target,
+      client,
+      title: args.title,
+      status: "generating",
+      started_at: new Date().toISOString(),
+      content: "",
+      sectionsTotal: total,
+      sectionsDone: 0,
+      currentSection: sections[0]?.label,
+    });
+
+    for (let i = 0; i < total; i++) {
+      const section = sections[i];
+
+      // Mark which section we're on (live progress for the UI).
+      setRecord({
+        reportId: args.reportId,
+        clientId: args.clientId,
+        target: targetName,
+        client,
+        title: args.title,
+        status: "generating",
+        content: accumulated,
+        sectionsTotal: total,
+        sectionsDone: i,
+        currentSection: section.label,
+      });
+
+      try {
+        const res = await fetch("/api/reports/llm/section", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            client_id: args.clientId,
+            report_type: args.reportId,
+            section_id: section.id,
+            knowledge_base: args.knowledgeBase,
+            prior_markdown: accumulated,
+          }),
+        });
+        const json = (await res.json()) as {
+          content?: string;
+          target?: string;
+          client?: string;
+          error?: string;
+        };
+        if (!res.ok || !json.content) {
+          setRecord({
+            reportId: args.reportId,
+            clientId: args.clientId,
+            target: targetName,
+            client,
+            title: args.title,
+            status: "error",
+            content: accumulated,
+            sectionsTotal: total,
+            sectionsDone: i,
+            currentSection: section.label,
+            error:
+              json.error ??
+              `Section "${section.label}" failed (HTTP ${res.status})`,
+          });
+          return;
+        }
+
+        accumulated = accumulated
+          ? `${accumulated}\n\n${json.content.trim()}`
+          : json.content.trim();
+        if (json.target) targetName = json.target;
+      } catch (err) {
+        setRecord({
+          reportId: args.reportId,
+          clientId: args.clientId,
+          target: targetName,
+          client,
+          title: args.title,
+          status: "error",
+          content: accumulated,
+          sectionsTotal: total,
+          sectionsDone: i,
+          currentSection: section.label,
+          error:
+            err instanceof Error
+              ? `Section "${section.label}": ${err.message}`
+              : "Network error",
+        });
+        return;
+      }
+    }
+
+    // All sections completed.
+    setRecord({
+      reportId: args.reportId,
+      clientId: args.clientId,
+      target: targetName,
+      client,
+      title: args.title,
+      status: "done",
+      content: accumulated,
+      generated_at: new Date().toISOString(),
+      sectionsTotal: total,
+      sectionsDone: total,
+    });
+    return;
+  }
+
+  // ---------- Legacy: single-call generation (used if a report has
+  // no `sections` defined — kept as a fallback for back-compat). ----
   try {
     const res = await fetch("/api/reports/llm", {
       method: "POST",
