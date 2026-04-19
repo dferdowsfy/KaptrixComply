@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getOpenRouterApiKey, isOpenRouterConfigured } from "@/lib/env";
+import { isSelfHostedLlmConfigured, getSelfHostedLlmModel } from "@/lib/env";
+import { llmChat } from "@/lib/llm/client";
 import { getPreviewSnapshot } from "@/lib/preview/data";
 import { PREVIEW_CLIENTS } from "@/lib/preview-clients";
 
@@ -11,26 +12,21 @@ interface Body {
   knowledge_base?: string;
 }
 
-// OpenRouter web-search-enabled model. This route is the ONLY external
-// path that leaves our infra; payload is sanitized before send.
-const OPENROUTER_MODEL = "openai/gpt-4o-mini-search-preview";
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-
+// All inference now runs on the self-hosted Ollama instance.
+// Qwen does NOT have built-in web search, so benchmarks are drawn
+// from the model's training knowledge + operator-provided KB only.
 const SYSTEM_PROMPT = `You are an AI diligence analyst performing CONTEXTUAL BENCHMARKING.
-You do NOT assess companies in isolation — you assess them RELATIVE to contextually relevant peers.
-
-You have a built-in web search tool. USE IT to:
-- Identify real, currently-operating companies and products that are direct or analog peers of the target.
-- Pull recent (last 12-18 months) public information: funding rounds, customer logos, product launches, model/vendor stack, regulatory posture, certifications, incidents.
-- Verify any claim you are uncertain about.
+You assess companies RELATIVE to contextually relevant peers drawn from your training knowledge
+and any operator-provided context. You do NOT have web access; be explicit about this limitation
+in your confidence rating.
 
 Procedure:
 1. TARGET CONTEXT — classify the target (organization or product), industry, AI use case, business model, customer segment, data sensitivity, deployment maturity, vendor stack, regulatory exposure, architecture pattern.
-2. COMPARABLE SELECTION — pick 3-7 REAL, NAMED competitors / analog products you have verified via web search. Match on AI use case, business model, data sensitivity, deployment maturity, technical approach, regulatory constraints. Cite a source URL for each comparable. Never invent companies.
+2. COMPARABLE SELECTION — pick 3-7 REAL, NAMED competitors / analog products you are confident existed as of your training cutoff. Match on AI use case, business model, data sensitivity, deployment maturity, technical approach, regulatory constraints. If you cannot verify a peer, OMIT it — never invent companies. Source URLs may be approximate homepage URLs.
 3. RELATIVE COMPARISON — for each dimension, classify target as "ahead" / "in_line" / "behind" peers, with concrete evidence.
 4. POSITIONING SUMMARY — specific, non-generic relative position.
 5. INVESTMENT INTERPRETATION — differentiation real? durability? risk concentration? validation priorities?
-6. CONFIDENCE — low/medium/high based on data completeness and source quality.
+6. CONFIDENCE — low/medium/high. Mark low or medium if recent data would materially change the picture.
 
 Return ONLY valid JSON matching this exact schema (no prose, no markdown, no code fences):
 {
@@ -112,61 +108,24 @@ function extractJson(text: string): unknown {
   }
 }
 
-interface OpenRouterAnnotation {
-  type?: string;
-  url_citation?: { url?: string; title?: string };
-}
-
-interface OpenRouterMessage {
-  content?: string;
-  annotations?: OpenRouterAnnotation[];
-}
-
-interface OpenRouterChoice {
-  message?: OpenRouterMessage;
-}
-
-interface OpenRouterResponse {
-  choices?: OpenRouterChoice[];
-  error?: { message?: string };
-}
-
-function extractWebSources(
-  message: OpenRouterMessage | undefined,
-): { url: string; title?: string }[] {
-  const annotations = message?.annotations;
-  if (!Array.isArray(annotations)) return [];
-  const seen = new Set<string>();
-  const sources: { url: string; title?: string }[] = [];
-  for (const a of annotations) {
-    const c = a.url_citation;
-    if (c?.url && !seen.has(c.url)) {
-      seen.add(c.url);
-      sources.push({ url: c.url, title: c.title });
-    }
-  }
-  return sources.slice(0, 12);
-}
-
 export async function POST(req: Request) {
-  if (!isOpenRouterConfigured()) {
+  if (!isSelfHostedLlmConfigured()) {
     return NextResponse.json(
       {
         error:
-          "OPENROUTER_API_KEY is not configured. Add it to .env.local and Vercel project settings.",
+          "Self-hosted LLM is not configured. Set SELF_HOSTED_LLM_BASE_URL and SELF_HOSTED_LLM_MODEL.",
       },
       { status: 503 },
     );
   }
 
-  // Rate-limit this endpoint — OpenRouter calls cost real money and
-  // leave our infra. Keyed by user when authenticated, IP otherwise.
+  // Rate-limit — self-hosted is cheap but we still don't want abuse.
   const { checkRateLimit, callerKey } = await import(
     "@/lib/security/rate-limit"
   );
   const rl = checkRateLimit({
     key: callerKey(req.headers, null, "positioning"),
-    limit: 10,
+    limit: 20,
     windowSeconds: 60,
   });
   if (!rl.allowed) {
@@ -210,28 +169,27 @@ export async function POST(req: Request) {
 
   const operatorKb = (body.knowledge_base ?? "").slice(0, 2000);
 
-  // Gate every outbound piece through the LLM policy layer. This
-  // redacts evidence AND writes an audit row (provider, model, tier,
-  // content fingerprint). Policy still allows external here because
-  // the positioning endpoint is explicitly tier "redacted_ok".
+  // Gate every outbound piece through the LLM policy layer.
+  // Self-hosted stays on our infra, so tier is "internal_only".
   const { gateInference } = await import("@/lib/security/llm-policy");
+  const model = getSelfHostedLlmModel();
   const [evDecision, kbDecision] = await Promise.all([
     gateInference({
-      provider: "openrouter",
-      model: OPENROUTER_MODEL,
-      tier: "redacted_ok",
+      provider: "self_hosted",
+      model,
+      tier: "internal_only",
       content: evidence,
     }),
     gateInference({
-      provider: "openrouter",
-      model: OPENROUTER_MODEL,
-      tier: "redacted_ok",
+      provider: "self_hosted",
+      model,
+      tier: "internal_only",
       content: operatorKb,
     }),
   ]);
   if (!evDecision.allowed) {
     return NextResponse.json(
-      { error: "External inference blocked for this engagement" },
+      { error: "Inference blocked for this engagement" },
       { status: 451 },
     );
   }
@@ -240,47 +198,24 @@ export async function POST(req: Request) {
 
   const userPrompt = `TARGET COMPANY: ${targetName}${industry ? ` (${industry})` : ""}
 
-INTERNAL EVIDENCE (sanitized — non-sensitive):
+INTERNAL EVIDENCE (sanitized):
 """
 ${safeEvidence}
 """
 
 ${safeOperatorKb ? `OPERATOR KNOWLEDGE BASE (sanitized):\n"""\n${safeOperatorKb}\n"""\n\n` : ""}TASK:
-Use web search to identify REAL competitors / analog products of "${targetName}". Verify each peer with at least one source URL. Then produce the contextual benchmarking JSON exactly per the schema. Begin web research now and return ONLY the JSON object — no commentary.`;
+Identify REAL competitors / analog products of "${targetName}" from your training knowledge. For each peer provide a best-effort source URL (company homepage is fine). Then produce the contextual benchmarking JSON exactly per the schema. Return ONLY the JSON object — no commentary.`;
 
   try {
-    const res = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${getOpenRouterApiKey()}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "https://kaptrix.app",
-        "X-Title": "Kaptrix Positioning",
-      },
-      body: JSON.stringify({
-        model: OPENROUTER_MODEL,
-        temperature: 0.2,
-        max_tokens: 2500,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-      }),
+    const { content: text } = await llmChat({
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.2,
+      maxTokens: 2500,
+      jsonMode: true,
     });
-
-    const json = (await res.json()) as OpenRouterResponse;
-
-    if (!res.ok) {
-      return NextResponse.json(
-        {
-          error: `OpenRouter request failed (${res.status}): ${json.error?.message ?? "unknown error"}`,
-        },
-        { status: 502 },
-      );
-    }
-
-    const message = json.choices?.[0]?.message;
-    const text = (message?.content ?? "").trim();
 
     let parsed: unknown;
     try {
@@ -292,13 +227,13 @@ Use web search to identify REAL competitors / analog products of "${targetName}"
       );
     }
 
-    const sources = extractWebSources(message);
-
-    return NextResponse.json({ positioning: parsed, sources });
+    // No web-search annotations from self-hosted; sources live inside
+    // the returned JSON (`comparables[].source_url`).
+    return NextResponse.json({ positioning: parsed, sources: [] });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
-      { error: `OpenRouter request failed: ${message}` },
+      { error: `Positioning request failed: ${message}` },
       { status: 502 },
     );
   }

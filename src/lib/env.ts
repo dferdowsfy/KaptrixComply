@@ -64,3 +64,24 @@ export function getOpenRouterEnvDebugInfo(): OpenRouterEnvDebugInfo {
     matchingEnvKeys,
   };
 }
+
+// -------------------- Self-hosted LLM (Ollama) --------------------
+
+export function isSelfHostedLlmConfigured(): boolean {
+  const baseUrl = getSelfHostedLlmBaseUrl();
+  const model = getSelfHostedLlmModel();
+  if (!baseUrl || !model) return false;
+  return !isPlaceholder(baseUrl) && !isPlaceholder(model);
+}
+
+export function getSelfHostedLlmBaseUrl(): string {
+  return getServerEnv("SELF_HOSTED_LLM_BASE_URL");
+}
+
+export function getSelfHostedLlmModel(): string {
+  return getServerEnv("SELF_HOSTED_LLM_MODEL");
+}
+
+export function getSelfHostedLlmApiKey(): string {
+  return getServerEnv("SELF_HOSTED_LLM_API_KEY");
+}

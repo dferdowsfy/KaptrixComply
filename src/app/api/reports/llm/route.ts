@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isOpenRouterConfigured, getOpenRouterApiKey } from "@/lib/env";
+import { isSelfHostedLlmConfigured } from "@/lib/env";
+import { llmChat } from "@/lib/llm/client";
 import { getPreviewSnapshot } from "@/lib/preview/data";
 import {
   getAdvancedReportConfig,
@@ -105,11 +106,11 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!isOpenRouterConfigured()) {
+  if (!isSelfHostedLlmConfigured()) {
     return NextResponse.json(
       {
         error:
-          "OpenRouter API key is not configured. Set OPENROUTER_API_KEY in .env.local or Vercel Project Settings to enable report generation.",
+          "Self-hosted LLM is not configured. Set SELF_HOSTED_LLM_BASE_URL and SELF_HOSTED_LLM_MODEL in .env.local / Vercel to enable report generation.",
       },
       { status: 503 },
     );
@@ -153,75 +154,21 @@ ${combinedEvidence}
 Return the report as clean markdown only. No preamble, no closing remarks, no code fences.`;
 
   try {
-    const openRouterRes = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getOpenRouterApiKey()}`,
-          "HTTP-Referer": "https://kaptrix.ai",
-          "X-Title": "Kaptrix AI Diligence",
-        },
-        body: JSON.stringify({
-          model: "perplexity/sonar-deep-research",
-          messages: [
-            { role: "system", content: config.systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          max_tokens: 8192,
-          temperature: 0.2,
-        }),
-      },
-    );
-
-    if (!openRouterRes.ok) {
-      const errText = await openRouterRes.text();
-      return NextResponse.json(
-        { error: `OpenRouter error ${openRouterRes.status}: ${errText}` },
-        { status: 502 },
-      );
-    }
-
-    const completion = (await openRouterRes.json()) as {
-      choices?: Array<{
-        message?: { content?: string | null; reasoning?: string | null };
-        finish_reason?: string;
-      }>;
-      error?: { message?: string };
-    };
-
-    if (completion.error?.message) {
-      return NextResponse.json(
-        { error: `OpenRouter error: ${completion.error.message}` },
-        { status: 502 },
-      );
-    }
-
-    const msg = completion.choices?.[0]?.message;
-    const rawContent = (msg?.content ?? "").toString();
-    const rawReasoning = (msg?.reasoning ?? "").toString();
-
-    // Some reasoning models (incl. perplexity sonar-deep-research) either
-    // emit the final answer inside <think>...</think> tags in content, or
-    // place the final answer in `reasoning` while content is empty. We
-    // strip think tags and fall back to reasoning if content is blank.
-    const stripThink = (s: string) =>
-      s.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-
-    let content = stripThink(rawContent);
-    if (!content) content = stripThink(rawReasoning);
+    const { content, finishReason } = await llmChat({
+      messages: [
+        { role: "system", content: config.systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.2,
+      maxTokens: 8192,
+    });
 
     if (!content) {
       return NextResponse.json(
         {
           error:
-            "Model returned an empty response. The deep-research model may have timed out or returned only tool traces.",
-          debug: {
-            finish_reason: completion.choices?.[0]?.finish_reason ?? null,
-            content_length: rawContent.length,
-            reasoning_length: rawReasoning.length,
-          },
+            "Model returned an empty response. The self-hosted model may have timed out or run out of memory.",
+          debug: { finish_reason: finishReason },
         },
         { status: 502 },
       );
