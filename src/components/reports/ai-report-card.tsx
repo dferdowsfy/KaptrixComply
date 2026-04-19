@@ -2,6 +2,11 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { AdvancedReportConfig } from "@/lib/reports/advanced-reports";
+import {
+  ReportMarkdown,
+  markdownToExportHtml,
+  buildExportDocumentStyles,
+} from "@/components/reports/report-markdown";
 
 interface Props {
   config: AdvancedReportConfig;
@@ -103,7 +108,7 @@ export function AiReportCard({
   }, [result]);
 
   const rendered = useMemo(
-    () => (result ? renderMarkdown(result.content) : null),
+    () => (result ? <ReportMarkdown source={result.content} /> : null),
     [result],
   );
 
@@ -173,8 +178,8 @@ export function AiReportCard({
         )}
 
         {rendered && (
-          <div className="mt-5 max-h-[520px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-5">
-            <div className="report-markdown">{rendered}</div>
+          <div className="mt-5 max-h-[640px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-inner">
+            {rendered}
           </div>
         )}
       </div>
@@ -219,243 +224,18 @@ function escapeHtml(s: string): string {
 }
 
 // Minimal inline formatter: **bold**, *italic*, `code`.
-function renderInline(text: string): string {
-  let s = escapeHtml(text);
-  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  s = s.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, "$1<em>$2</em>");
-  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
-  return s;
-}
-
-// Convert markdown-ish text into plain React nodes. Supports
-// headings (# ## ###), unordered (-, *) and ordered (1.) lists,
-// and paragraphs. Keeps output deterministic.
-function renderMarkdown(md: string): React.ReactNode {
-  const lines = md.replace(/\r\n?/g, "\n").split("\n");
-  const nodes: React.ReactNode[] = [];
-  let para: string[] = [];
-  let list: { ordered: boolean; items: string[] } | null = null;
-
-  const flushPara = () => {
-    if (para.length === 0) return;
-    const html = renderInline(para.join(" "));
-    nodes.push(
-      <p
-        key={`p-${nodes.length}`}
-        className="mb-3 text-sm leading-6 text-slate-700"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />,
-    );
-    para = [];
-  };
-
-  const flushList = () => {
-    if (!list) return;
-    const items = list.items.map((t, i) => (
-      <li
-        key={i}
-        className="ml-5 text-sm leading-6 text-slate-700"
-        dangerouslySetInnerHTML={{ __html: renderInline(t) }}
-      />
-    ));
-    nodes.push(
-      list.ordered ? (
-        <ol
-          key={`ol-${nodes.length}`}
-          className="mb-3 list-decimal space-y-1"
-        >
-          {items}
-        </ol>
-      ) : (
-        <ul
-          key={`ul-${nodes.length}`}
-          className="mb-3 list-disc space-y-1"
-        >
-          {items}
-        </ul>
-      ),
-    );
-    list = null;
-  };
-
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-
-    if (!line.trim()) {
-      flushPara();
-      flushList();
-      continue;
-    }
-
-    const h = /^(#{1,6})\s+(.*)$/.exec(line);
-    if (h) {
-      flushPara();
-      flushList();
-      const level = h[1].length;
-      const text = renderInline(h[2]);
-      const cls =
-        level === 1
-          ? "mt-4 mb-2 text-lg font-bold text-slate-900"
-          : level === 2
-            ? "mt-4 mb-2 text-base font-bold text-slate-900"
-            : level === 3
-              ? "mt-3 mb-1.5 text-sm font-semibold text-slate-900"
-              : "mt-2 mb-1 text-xs font-semibold uppercase tracking-wide text-slate-700";
-      nodes.push(
-        level === 1 ? (
-          <h1
-            key={`h-${nodes.length}`}
-            className={cls}
-            dangerouslySetInnerHTML={{ __html: text }}
-          />
-        ) : level === 2 ? (
-          <h2
-            key={`h-${nodes.length}`}
-            className={cls}
-            dangerouslySetInnerHTML={{ __html: text }}
-          />
-        ) : level === 3 ? (
-          <h3
-            key={`h-${nodes.length}`}
-            className={cls}
-            dangerouslySetInnerHTML={{ __html: text }}
-          />
-        ) : (
-          <h4
-            key={`h-${nodes.length}`}
-            className={cls}
-            dangerouslySetInnerHTML={{ __html: text }}
-          />
-        ),
-      );
-      continue;
-    }
-
-    const ul = /^\s*[-*]\s+(.*)$/.exec(line);
-    if (ul) {
-      flushPara();
-      if (!list || list.ordered) {
-        flushList();
-        list = { ordered: false, items: [] };
-      }
-      list.items.push(ul[1]);
-      continue;
-    }
-
-    const ol = /^\s*\d+\.\s+(.*)$/.exec(line);
-    if (ol) {
-      flushPara();
-      if (!list || !list.ordered) {
-        flushList();
-        list = { ordered: true, items: [] };
-      }
-      list.items.push(ol[1]);
-      continue;
-    }
-
-    flushList();
-    para.push(line.trim());
-  }
-
-  flushPara();
-  flushList();
-
-  return nodes;
-}
-
-// Turn markdown into inline HTML for export surfaces (PDF/DOCX).
-function markdownToHtml(md: string): string {
-  const lines = md.replace(/\r\n?/g, "\n").split("\n");
-  const out: string[] = [];
-  let para: string[] = [];
-  let list: { ordered: boolean; items: string[] } | null = null;
-
-  const flushPara = () => {
-    if (para.length === 0) return;
-    out.push(`<p>${renderInline(para.join(" "))}</p>`);
-    para = [];
-  };
-  const flushList = () => {
-    if (!list) return;
-    const items = list.items.map((t) => `<li>${renderInline(t)}</li>`).join("");
-    out.push(list.ordered ? `<ol>${items}</ol>` : `<ul>${items}</ul>`);
-    list = null;
-  };
-
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-    if (!line.trim()) {
-      flushPara();
-      flushList();
-      continue;
-    }
-    const h = /^(#{1,6})\s+(.*)$/.exec(line);
-    if (h) {
-      flushPara();
-      flushList();
-      const level = Math.min(h[1].length, 4);
-      out.push(`<h${level}>${renderInline(h[2])}</h${level}>`);
-      continue;
-    }
-    const ul = /^\s*[-*]\s+(.*)$/.exec(line);
-    if (ul) {
-      flushPara();
-      if (!list || list.ordered) {
-        flushList();
-        list = { ordered: false, items: [] };
-      }
-      list.items.push(ul[1]);
-      continue;
-    }
-    const ol = /^\s*\d+\.\s+(.*)$/.exec(line);
-    if (ol) {
-      flushPara();
-      if (!list || !list.ordered) {
-        flushList();
-        list = { ordered: true, items: [] };
-      }
-      list.items.push(ol[1]);
-      continue;
-    }
-    flushList();
-    para.push(line.trim());
-  }
-  flushPara();
-  flushList();
-  return out.join("\n");
-}
-
-function buildDocumentStyles(): string {
-  return `
-    body { font-family: Calibri, Arial, sans-serif; color: #111; margin: 0.75in; }
-    .cover { border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 18px; }
-    .cover h1 { font-size: 22pt; margin: 0 0 4px 0; }
-    .cover p { margin: 0; color: #555; font-size: 10pt; }
-    h1 { font-size: 18pt; margin: 18px 0 6px 0; }
-    h2 { font-size: 14pt; margin: 14px 0 6px 0; }
-    h3 { font-size: 12pt; margin: 10px 0 4px 0; }
-    h4 { font-size: 10pt; text-transform: uppercase; letter-spacing: 1px; margin: 8px 0 3px 0; }
-    p { font-size: 11pt; line-height: 1.55; margin: 0 0 8px 0; }
-    ul, ol { font-size: 11pt; line-height: 1.55; margin: 0 0 8px 18px; padding: 0; }
-    li { margin-bottom: 2px; }
-    strong { font-weight: 700; }
-    em { font-style: italic; }
-    code { font-family: Consolas, monospace; background: #f2f2f2; padding: 1px 4px; border-radius: 3px; }
-  `;
-}
-
 function buildDocHtml(args: {
   title: string;
   subtitle: string;
   markdown: string;
 }): string {
-  const body = markdownToHtml(args.markdown);
+  const body = markdownToExportHtml(args.markdown);
   return `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head>
 <meta charset="utf-8" />
 <title>${escapeHtml(args.title)}</title>
-<style>${buildDocumentStyles()}</style>
+<style>${buildExportDocumentStyles()}</style>
 </head>
 <body>
 <div class="cover">
@@ -473,15 +253,15 @@ function openPrintWindow(args: {
   markdown: string;
   autoPrint?: boolean;
 }): void {
-  const body = markdownToHtml(args.markdown);
+  const body = markdownToExportHtml(args.markdown);
   const html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
 <title>${escapeHtml(args.title)}</title>
 <style>
-${buildDocumentStyles()}
-@media print { @page { margin: 0.6in; } }
+${buildExportDocumentStyles()}
+@media print { @page { margin: 0.55in; } }
 </style>
 </head>
 <body>
@@ -491,15 +271,13 @@ ${buildDocumentStyles()}
 </div>
 ${body}
 <script>
-${args.autoPrint ? "window.addEventListener('load', function(){ setTimeout(function(){ window.focus(); window.print(); }, 150); });" : ""}
+${args.autoPrint ? "window.addEventListener('load', function(){ setTimeout(function(){ window.focus(); window.print(); }, 200); });" : ""}
 </script>
 </body>
 </html>`;
 
-  const win = window.open("", "_blank", "width=900,height=1100");
+  const win = window.open("", "_blank", "width=960,height=1200");
   if (!win) {
-    // Popup blocked — fall back to a same-tab data URL download so the
-    // user can still get the PDF by printing to PDF themselves.
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");
@@ -510,3 +288,4 @@ ${args.autoPrint ? "window.addEventListener('load', function(){ setTimeout(funct
   win.document.write(html);
   win.document.close();
 }
+

@@ -21,7 +21,16 @@ export interface AdvancedReportConfig {
   userPromptIntro: string;
 }
 
-const FORMAT_RULES = `Output format: clean markdown. Use '#' for the report title, '##' for each numbered top-level section, '###' for sub-sections, '-' for bullet points, and bold ('**text**') sparingly for emphasis. Do NOT wrap the output in code fences. Do NOT include a preamble or closing remarks — return the report only.`;
+const FORMAT_RULES = `Output format: clean GitHub-flavored markdown.
+- Use '#' for the report title (once), '##' for each numbered top-level section, '###' for sub-sections, '####' for small eyebrow labels.
+- Use '-' for bullet points.
+- Use **bold** for key terms and emphasis; use *italics* sparingly.
+- When presenting scores, render them as a bulleted list where each item is exactly "Label: X.X / 5" so they can be rendered as progress bars. Example: "- Product credibility: 3.6 / 5".
+- When presenting risks, mitigations, levers, competitors, or any comparative data, ALWAYS use a proper markdown table with a header row and separator (| Column | Column |\\n|---|---|). Tables are strongly preferred over nested bullets for structured data.
+- Tag severity or status inline using bracketed tokens so the UI can color-code them: [CRITICAL], [HIGH], [MEDIUM], [LOW], [OK], [STRENGTH], [RISK], [GAP]. Example: "| Tenancy boundary [HIGH] | ... |".
+- Use '> ' blockquotes for key insights, partner-level takeaways, or callouts the reader should not miss.
+- Use '---' as a horizontal rule between major sections when it aids scanability.
+- Do NOT wrap the entire output in code fences. Do NOT include a preamble or closing remarks — return the report only.`;
 
 const MASTER_PROMPT = `You are performing institutional-grade AI diligence for a private equity firm.
 
