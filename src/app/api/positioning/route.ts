@@ -5,7 +5,7 @@ import { getPreviewSnapshot } from "@/lib/preview/data";
 import { PREVIEW_CLIENTS } from "@/lib/preview-clients";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 interface Body {
   client_id: string;

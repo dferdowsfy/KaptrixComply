@@ -21,6 +21,8 @@ export interface LlmChatOptions {
   model?: string;
   /** If true, ask the model to return JSON (Ollama supports "format": "json"). */
   jsonMode?: boolean;
+  /** Abort the fetch after this many ms. Defaults to 280_000 (slightly under Vercel Pro's 300s cap). */
+  timeoutMs?: number;
 }
 
 export interface LlmChatResult {
@@ -68,11 +70,28 @@ export async function llmChat(opts: LlmChatOptions): Promise<LlmChatResult> {
     body.response_format = { type: "json_object" };
   }
 
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  const timeoutMs = opts.timeoutMs ?? 280_000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if ((err as { name?: string })?.name === "AbortError") {
+      throw new Error(
+        `LLM request timed out after ${Math.round(timeoutMs / 1000)}s`,
+      );
+    }
+    throw err;
+  }
+  clearTimeout(timer);
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
