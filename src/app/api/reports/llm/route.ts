@@ -7,7 +7,7 @@ import {
 } from "@/lib/reports/advanced-reports";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 interface Body {
   client_id: string;
@@ -184,13 +184,45 @@ Return the report as clean markdown only. No preamble, no closing remarks, no co
     }
 
     const completion = (await openRouterRes.json()) as {
-      choices: Array<{ message: { content: string } }>;
+      choices?: Array<{
+        message?: { content?: string | null; reasoning?: string | null };
+        finish_reason?: string;
+      }>;
+      error?: { message?: string };
     };
 
-    const content = (completion.choices[0]?.message?.content ?? "").trim();
+    if (completion.error?.message) {
+      return NextResponse.json(
+        { error: `OpenRouter error: ${completion.error.message}` },
+        { status: 502 },
+      );
+    }
+
+    const msg = completion.choices?.[0]?.message;
+    const rawContent = (msg?.content ?? "").toString();
+    const rawReasoning = (msg?.reasoning ?? "").toString();
+
+    // Some reasoning models (incl. perplexity sonar-deep-research) either
+    // emit the final answer inside <think>...</think> tags in content, or
+    // place the final answer in `reasoning` while content is empty. We
+    // strip think tags and fall back to reasoning if content is blank.
+    const stripThink = (s: string) =>
+      s.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
+    let content = stripThink(rawContent);
+    if (!content) content = stripThink(rawReasoning);
+
     if (!content) {
       return NextResponse.json(
-        { error: "Model returned an empty response" },
+        {
+          error:
+            "Model returned an empty response. The deep-research model may have timed out or returned only tool traces.",
+          debug: {
+            finish_reason: completion.choices?.[0]?.finish_reason ?? null,
+            content_length: rawContent.length,
+            reasoning_length: rawReasoning.length,
+          },
+        },
         { status: 502 },
       );
     }
