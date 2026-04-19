@@ -35,6 +35,9 @@ export default function PreviewHomePage() {
   const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // User approval status
+  const [userApproved, setUserApproved] = useState<boolean | null>(null);
+
   const loadEngagements = useCallback(async () => {
     try {
       const res = await fetch("/api/preview/engagements", { cache: "no-store" });
@@ -49,9 +52,26 @@ export default function PreviewHomePage() {
     }
   }, []);
 
+  const loadUserProfile = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/profile", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setUserApproved(data.approved ?? false);
+      } else {
+        // Not authenticated, allow demo/preview mode
+        setUserApproved(false);
+      }
+    } catch {
+      // Not authenticated, allow demo/preview mode
+      setUserApproved(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadEngagements();
-  }, [loadEngagements]);
+    loadUserProfile();
+  }, [loadEngagements, loadUserProfile]);
 
   // Merge: real engagements first, then preview mock clients (if any) that aren't in Supabase
   const engagementIds = new Set(engagements.map((e) => e.id));
@@ -74,16 +94,22 @@ export default function PreviewHomePage() {
           title="Your active client roster"
           description="Choose an engagement to dive into its workspace, or add a new client below."
         />
-        <button
-          type="button"
-          onClick={() => setShowForm(!showForm)}
-          className="shrink-0 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-        >
-          {showForm ? "Cancel" : "+ New Client"}
-        </button>
+        {userApproved ? (
+          <button
+            type="button"
+            onClick={() => setShowForm(!showForm)}
+            className="shrink-0 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          >
+            {showForm ? "Cancel" : "+ New Client"}
+          </button>
+        ) : (
+          <div className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-600">
+            New client creation requires account approval
+          </div>
+        )}
       </div>
 
-      {showForm && (
+      {showForm && userApproved && (
         <NewClientForm
           onCreated={() => {
             setShowForm(false);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase/service";
+import { requireAuth, authErrorResponse } from "@/lib/security/authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,11 +24,22 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = getServiceClient();
-  if (!supabase) {
+  // Require authentication to create a new client
+  let ctx;
+  try {
+    ctx = await requireAuth();
+  } catch (err) {
+    return authErrorResponse(err);
+  }
+
+  // Only approved users can create new clients
+  if (!ctx.approved) {
     return NextResponse.json(
-      { error: "Supabase not configured" },
-      { status: 503 },
+      {
+        error: "Your account has not yet been approved to create new clients. Please contact support.",
+        code: "not_approved",
+      },
+      { status: 403 },
     );
   }
 
@@ -52,7 +64,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await ctx.supabase
     .from("engagements")
     .insert({
       client_firm_name,

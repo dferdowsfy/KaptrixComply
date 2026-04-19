@@ -18,6 +18,7 @@ export interface AuthContext {
   userId: string;
   email: string | null;
   role: AppRole | null;
+  approved: boolean;
 }
 
 export class AuthError extends Error {
@@ -46,7 +47,7 @@ export async function requireAuth(): Promise<AuthContext> {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("role, email")
+    .select("role, email, approved")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -55,6 +56,7 @@ export async function requireAuth(): Promise<AuthContext> {
     userId: user.id,
     email: profile?.email ?? user.email ?? null,
     role: (profile?.role as AppRole | undefined) ?? null,
+    approved: profile?.approved ?? false,
   };
 }
 
