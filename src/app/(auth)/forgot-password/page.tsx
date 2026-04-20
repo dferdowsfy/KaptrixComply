@@ -26,9 +26,20 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     const supabase = createClient();
 
+    const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(
+      /\/$/, "",
+    );
     const siteUrl =
-      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-      window.location.origin;
+      configuredSiteUrl ||
+      (process.env.NODE_ENV === "development" ? window.location.origin : "");
+
+    if (!siteUrl) {
+      setError(
+        "Reset link destination is not configured. Set NEXT_PUBLIC_SITE_URL to your production domain.",
+      );
+      setLoading(false);
+      return;
+    }
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       email,
