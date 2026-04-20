@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { llmChat } from "@/lib/llm/client";
-import { isSelfHostedLlmConfigured, getSelfHostedLlmModelForTask } from "@/lib/env";
+import { isSelfHostedLlmConfigured, getSelfHostedLlmModelForTask, isGroqConfigured } from "@/lib/env";
+import { getGroqClient } from "@/lib/anthropic/client";
 import { getServiceClient } from "@/lib/supabase/service";
 import { getPreviewSnapshot } from "@/lib/preview/data";
 
@@ -68,7 +69,9 @@ function buildContextFromSnapshot(
       `[document] ${d.filename} (${d.category}, status: ${d.parse_status})`,
     );
   });
-  return parts.join("\n").slice(0, 60_000);
+  // Keep context compact for the 3B chat model — large prompts cause
+  // enormous CPU prompt-processing time with diminishing returns.
+  return parts.join("\n").slice(0, 16_000);
 }
 
 async function persistTurn(args: {
@@ -90,6 +93,28 @@ async function persistTurn(args: {
     metadata: args.metadata ?? null,
   });
   if (error) console.warn("[chat] persist failed", error.message);
+}
+
+/**
+ * Generate follow-up suggestions without an LLM call.
+ * Keyword-matched prompts relevant to AI diligence topics.
+ */
+const SUGGESTION_POOL: Record<string, string[]> = {
+  risk: ["What mitigations exist?", "How severe is this risk?", "Any precedent for this?"],
+  vendor: ["What is the switching cost?", "Are there alternatives?", "Is there vendor lock-in?"],
+  score: ["What drove this score?", "How could it improve?", "Which dimension is weakest?"],
+  data: ["Is customer data isolated?", "Any PII exposure?", "What about data provenance?"],
+  model: ["Which models are used?", "Is there model concentration?", "Any fine-tuning?"],
+  security: ["Is there SOC2?", "Any past incidents?", "Audit trail coverage?"],
+  default: ["Summarize the key risks", "What are the strengths?", "What needs more evidence?"],
+};
+
+function generateSuggestions(question: string): string[] {
+  const q = question.toLowerCase();
+  for (const [keyword, suggestions] of Object.entries(SUGGESTION_POOL)) {
+    if (keyword !== "default" && q.includes(keyword)) return suggestions;
+  }
+  return SUGGESTION_POOL.default;
 }
 
 export async function POST(req: Request) {
@@ -114,7 +139,7 @@ export async function POST(req: Request) {
   // Build context: prefer server-side Supabase snapshot when a client_id
   // is provided; fall back to caller-supplied evidence string for
   // backwards compatibility with older chatbot clients.
-  let context = (body.context ?? "").slice(0, 60_000);
+  let context = (body.context ?? "").slice(0, 16_000);
   if (clientId) {
     try {
       const snapshot = await getPreviewSnapshot(clientId);
@@ -128,15 +153,16 @@ export async function POST(req: Request) {
   // insights, pre-analysis) so operator-submitted context is available
   // to the model regardless of whether we built context from Supabase
   // or the caller string.
-  const kbText = (body.knowledge_base ?? "").slice(0, 20_000);
+  const kbText = (body.knowledge_base ?? "").slice(0, 6_000);
   if (kbText) {
     context = `${context}\n\n--- OPERATOR-SUBMITTED KNOWLEDGE BASE ---\n${kbText}`.slice(
       0,
-      80_000,
+      20_000,
     );
   }
 
-  if (!isSelfHostedLlmConfigured()) {
+  const useGroq = isGroqConfigured();
+  if (!useGroq && !isSelfHostedLlmConfigured()) {
     await persistTurn({
       session_id: sessionId,
       client_id: clientId,
@@ -146,7 +172,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Self-hosted LLM is not configured. Set SELF_HOSTED_LLM_BASE_URL and SELF_HOSTED_LLM_MODEL in .env.local or Vercel to enable the chatbot.",
+          "No LLM provider configured. Set GROQ_API_KEY (preferred for chat) or SELF_HOSTED_LLM_BASE_URL + SELF_HOSTED_LLM_MODEL in .env.local or Vercel.",
       },
       { status: 503 },
     );
@@ -177,63 +203,46 @@ Answer:`;
   });
 
   try {
-    // Run answer + follow-up suggestions in parallel via the unified
-    // self-hosted LLM client. Suggestions are best-effort.
-    const chatModel = getSelfHostedLlmModelForTask("chat");
-    const [answerResp, suggestionsResp] = await Promise.all([
-      llmChat({
+    let answer: string;
+    let usedModel: string;
+
+    if (useGroq) {
+      // Groq: ~500 tok/s on Llama 3.3 70B — sub-second chat responses.
+      const groqModel = "llama-3.3-70b-versatile";
+      const groq = getGroqClient();
+      const completion = await groq.chat.completions.create({
+        model: groqModel,
+        messages: [
+          { role: "system", content: SYSTEM_INSTRUCTION },
+          { role: "user", content: `EVIDENCE CONTEXT:\n"""\n${context}\n"""\n\n${history ? `RECENT CONVERSATION:\n${history}\n\n` : ""}USER QUESTION:\n${question}` },
+        ],
+        temperature: 0.3,
+        max_completion_tokens: 400,
+      });
+      answer = (completion.choices[0]?.message?.content ?? "").trim();
+      usedModel = groqModel;
+    } else {
+      // Fallback: self-hosted Ollama (slow on CPU, ~12 tok/s best case).
+      const chatModel = getSelfHostedLlmModelForTask("chat");
+      const answerResp = await llmChat({
         model: chatModel,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.3,
-        maxTokens: 800,
-      }),
-      llmChat({
-        model: chatModel,
-        messages: [
-          {
-            role: "user",
-            content: `You are generating follow-up question suggestions for a diligence chat. Based on the user's question and the available evidence, return exactly 3 short, specific follow-up questions a diligence analyst might ask next. Keep each under 8 words. Return JSON only: {"suggestions":["q1","q2","q3"]}.
-
-EVIDENCE SNIPPET:
-${context.slice(0, 4000)}
-
-USER JUST ASKED: ${question}
-
-JSON:`,
-          },
-        ],
-        temperature: 0.7,
-        maxTokens: 200,
-        jsonMode: true,
-      }).catch(() => null),
-    ]);
-
-    const answer = (answerResp.content ?? "").trim();
-
-    let suggestions: string[] = [];
-    if (suggestionsResp?.content) {
-      try {
-        const parsed = JSON.parse(suggestionsResp.content) as {
-          suggestions?: unknown;
-        };
-        if (Array.isArray(parsed.suggestions)) {
-          suggestions = parsed.suggestions
-            .filter((s): s is string => typeof s === "string")
-            .map((s) => s.trim())
-            .filter(Boolean)
-            .slice(0, 4);
-        }
-      } catch {
-        // ignore
-      }
+        maxTokens: 300,
+        timeoutMs: 90_000,
+      });
+      answer = (answerResp.content ?? "").trim();
+      usedModel = chatModel;
     }
+
+    const suggestions = generateSuggestions(question);
 
     await persistTurn({
       session_id: sessionId,
       client_id: clientId,
       role: "assistant",
       content: answer,
-      metadata: { model: chatModel },
+      metadata: { model: usedModel, provider: useGroq ? "groq" : "self_hosted" },
     });
 
     return NextResponse.json({ answer, suggestions });
