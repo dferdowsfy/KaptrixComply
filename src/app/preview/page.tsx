@@ -7,6 +7,8 @@ import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import type { PreviewClientSummary } from "@/lib/preview-clients";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Engagement } from "@/lib/types";
+import { INDUSTRY_OPTIONS, type Industry } from "@/lib/industry-requirements";
+import { setClientIndustry } from "@/lib/preview-intake";
 
 /** Map a Supabase Engagement row into the shape the client card expects. */
 function engagementToClient(e: Engagement): PreviewClientSummary {
@@ -154,6 +156,9 @@ function NewClientForm({ onCreated }: { onCreated: () => void }) {
     delivery_deadline: "",
     client_contact_email: "",
     referral_source: "",
+    industry: "" as Industry | "",
+    engagement_type: "",
+    buyer_archetype: "",
   });
 
   function update(key: string, value: string) {
@@ -165,6 +170,12 @@ function NewClientForm({ onCreated }: { onCreated: () => void }) {
     setSaving(true);
     setError("");
 
+    if (!form.industry) {
+      setError("Profile (industry) is required — it is locked for the life of the engagement.");
+      setSaving(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/preview/engagements", {
         method: "POST",
@@ -175,12 +186,19 @@ function NewClientForm({ onCreated }: { onCreated: () => void }) {
           delivery_deadline: form.delivery_deadline || null,
           client_contact_email: form.client_contact_email || null,
           referral_source: form.referral_source || null,
+          engagement_type: form.engagement_type || null,
+          buyer_archetype: form.buyer_archetype || null,
         }),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+
+      const created = (await res.json()) as { id?: string };
+      if (created?.id && form.industry) {
+        setClientIndustry(created.id, form.industry);
       }
 
       onCreated();
@@ -295,6 +313,57 @@ function NewClientForm({ onCreated }: { onCreated: () => void }) {
             <option value="signal_hunter">Signal Hunter</option>
             <option value="platform">Platform</option>
             <option value="content">Content</option>
+          </select>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="block text-sm font-medium text-slate-700">
+            Profile / Industry * <span className="text-xs font-normal text-rose-600">(locked after creation)</span>
+          </label>
+          <select
+            required
+            value={form.industry}
+            onChange={(e) => update("industry", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option value="">Select an industry…</option>
+            {INDUSTRY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-500">
+            Drives industry-specific intake depth, scoring weights, and required artifacts. Cannot be changed once the engagement is created — a new engagement must be spun up to re-classify.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Engagement Type</label>
+          <select
+            value={form.engagement_type}
+            onChange={(e) => update("engagement_type", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option value="">Select…</option>
+            <option value="pe_diligence">PE / growth equity diligence</option>
+            <option value="corporate_new_ai">Corporate IC — new AI initiative</option>
+            <option value="corporate_continuation">Corporate IC — program continuation</option>
+            <option value="vendor_selection">Vendor selection / RFP</option>
+            <option value="portfolio_review">Portfolio review — post-close</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Buyer Archetype</label>
+          <select
+            value={form.buyer_archetype}
+            onChange={(e) => update("buyer_archetype", e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option value="">Select…</option>
+            <option value="large_cap_pe">Large-cap PE</option>
+            <option value="growth_equity">Growth equity</option>
+            <option value="strategic_corp_dev">Strategic / corp dev</option>
+            <option value="mid_market_operator">Mid-market operator</option>
+            <option value="smb_operator">SMB operator</option>
           </select>
         </div>
       </div>

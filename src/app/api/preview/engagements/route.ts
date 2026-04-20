@@ -54,12 +54,20 @@ export async function POST(request: NextRequest) {
     engagement_fee,
     delivery_deadline,
     industry,
+    engagement_type,
+    buyer_archetype,
     summary,
   } = body;
 
   if (!client_firm_name || !target_company_name || !deal_stage) {
     return NextResponse.json(
       { error: "Missing required fields: client_firm_name, target_company_name, deal_stage" },
+      { status: 400 },
+    );
+  }
+  if (!industry) {
+    return NextResponse.json(
+      { error: "Missing required field: industry (profile is locked once the client is created)" },
       { status: 400 },
     );
   }
@@ -76,6 +84,9 @@ export async function POST(request: NextRequest) {
       referral_source: referral_source || null,
       engagement_fee: engagement_fee || null,
       delivery_deadline: delivery_deadline || null,
+      industry,
+      engagement_type: engagement_type || null,
+      buyer_archetype: buyer_archetype || null,
     })
     .select()
     .single();

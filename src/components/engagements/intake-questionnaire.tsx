@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  INDUSTRY_OPTIONS,
   INDUSTRY_PROFILES,
   type Industry,
 } from "@/lib/industry-requirements";
@@ -20,34 +19,110 @@ export interface IntakeQuestion {
 }
 
 const CORE_INTAKE_QUESTIONS: IntakeQuestion[] = [
-  // Deal context
+  // ────────────────── Engagement Type ──────────────────
+  // Drives every downstream lens. PE pre-close vs corporate IC vs mid-market
+  // vendor selection each weight different evidence.
+  {
+    id: "engagement_type",
+    section: "Engagement Type",
+    prompt: "What decision is this engagement informing?",
+    help: "Determines how Kaptrix weights evidence and frames the report (IC memo vs program continuation vs vendor RFP).",
+    type: "single",
+    options: [
+      "PE / growth equity — pre-close diligence on a target",
+      "Corporate IC — greenlight a new AI initiative",
+      "Corporate IC — continue/kill existing AI program",
+      "Vendor selection / RFP evaluation",
+      "Portfolio review — post-close operating review",
+    ],
+  },
+  {
+    id: "buyer_archetype",
+    section: "Engagement Type",
+    prompt: "Who is the decision-making audience?",
+    type: "single",
+    options: [
+      "Large-cap PE fund",
+      "Growth equity fund",
+      "Strategic / corp dev",
+      "Mid-market operator ($50M–$500M)",
+      "SMB operator (<$50M)",
+    ],
+  },
+  {
+    id: "buyer_industry",
+    section: "Engagement Type",
+    prompt: "If the buyer is a corporate / operator, what is their industry?",
+    help: "Leave blank for a PE fund. Used to stress-test vendor fit against the buyer's own regulatory and operational context.",
+    type: "single",
+    options: [
+      "N/A — financial investor",
+      "Financial services / banking",
+      "Healthcare / life sciences",
+      "Insurance",
+      "Legal / professional services",
+      "Government / defense",
+      "Retail / eCommerce",
+      "Industrial / manufacturing",
+      "Technology / SaaS",
+      "Energy / utilities",
+      "Other",
+    ],
+  },
+  {
+    id: "target_size_usd",
+    section: "Engagement Type",
+    prompt: "Target's annual run-rate revenue (or initiative budget)",
+    type: "single",
+    options: [
+      "<$10M",
+      "$10M – $50M",
+      "$50M – $250M",
+      "$250M – $1B",
+      "$1B+",
+      "Unknown",
+    ],
+  },
+  {
+    id: "decision_horizon_days",
+    section: "Engagement Type",
+    prompt: "Days until the decision is made (IC vote, go-live, or walk-away)",
+    help: "Be honest — it compresses or relaxes the depth of the diligence.",
+    type: "short_text",
+  },
+
+  // ────────────────── Deal / Initiative Thesis ──────────────────
   {
     id: "deal_thesis",
     section: "Deal Thesis",
-    prompt: "What is the client's primary thesis for this investment?",
+    prompt: "What is the primary thesis for this investment or initiative?",
     help:
-      "Select all that apply. You can also free-form additional context. AI will pre-fill based on your uploaded investor materials.",
+      "Select all that apply. AI will pre-fill based on uploaded investor materials or internal proposals.",
     type: "multi",
     options: [
       "Category-defining AI platform",
       "Margin expansion via AI efficiency",
+      "Revenue uplift / new AI-native product",
+      "Cost reduction / automation of an existing function",
       "Rollup / platform acquisition",
       "Defensive hedge in incumbent sector",
       "Strategic data moat",
       "Talent and IP acquisition",
       "Turnaround / operational fix",
+      "Regulatory / compliance modernization",
     ],
   },
   {
     id: "deal_stage",
     section: "Deal Thesis",
-    prompt: "What is the current deal stage?",
+    prompt: "Current stage of the decision",
     type: "single",
     options: [
-      "Pre-LOI / sourcing",
-      "LOI signed, early diligence",
+      "Sourcing / exploratory",
+      "Pre-LOI / vendor shortlist",
+      "LOI signed / RFP in flight",
       "Confirmatory diligence",
-      "Post-LOI repricing",
+      "Post-LOI repricing / contract negotiation",
       "Portfolio review / post-close",
     ],
   },
@@ -66,15 +141,223 @@ const CORE_INTAKE_QUESTIONS: IntakeQuestion[] = [
       "Key-person risk",
       "Competitive defensibility",
       "Enterprise sales readiness",
+      "Internal team readiness to operate",
+      "Data rights and IP provenance",
+      "Integration with existing stack",
     ],
   },
 
-  // Target profile
+  // ────────────────── Stakeholders & Sponsor ──────────────────
+  {
+    id: "internal_sponsor_role",
+    section: "Stakeholders & Sponsor",
+    prompt: "Who is the internal sponsor or decision owner?",
+    help: "The person whose neck is on the line if this deal / initiative fails.",
+    type: "single",
+    options: [
+      "CEO / Managing Partner",
+      "CFO",
+      "COO",
+      "CIO / CTO",
+      "Head of AI / Chief AI Officer",
+      "General Counsel / CRO",
+      "Business unit leader",
+      "Board / IC chair",
+      "Investment team partner",
+    ],
+  },
+  {
+    id: "dissenting_voices",
+    section: "Stakeholders & Sponsor",
+    prompt: "Who might vote against or materially push back?",
+    type: "multi",
+    options: [
+      "Security / CISO",
+      "Legal / compliance",
+      "Finance / CFO org",
+      "Operations / field teams",
+      "Board / IC members",
+      "Regulators (informally)",
+      "Existing vendor incumbent",
+      "No known dissent",
+    ],
+  },
+  {
+    id: "approval_path",
+    section: "Stakeholders & Sponsor",
+    prompt: "Who signs and what veto rights exist?",
+    help: "Free-form. Name the chain. Called out in the IC memo so recommendations land with the right owners.",
+    type: "long_text",
+  },
+
+  // ────────────────── Budget & Unit Economics ──────────────────
+  {
+    id: "investment_size_usd",
+    section: "Budget & Unit Economics",
+    prompt: "Total investment / capital at risk (USD)",
+    help: "Equity check size, initiative budget, or multi-year contract TCV.",
+    type: "short_text",
+  },
+  {
+    id: "annual_run_rate_usd",
+    section: "Budget & Unit Economics",
+    prompt: "Expected year-1 AI operating cost (USD)",
+    help: "Inference, vendor fees, infra, data ops, people loaded.",
+    type: "short_text",
+  },
+  {
+    id: "cost_sensitivity",
+    section: "Budget & Unit Economics",
+    prompt: "How price-sensitive is the buyer to AI costs growing?",
+    type: "scale",
+    scale_min: 1,
+    scale_max: 5,
+    scale_labels: ["Accept high burn for speed", "Highly margin-sensitive"],
+  },
+  {
+    id: "payback_expectation_months",
+    section: "Budget & Unit Economics",
+    prompt: "Expected payback period (months)",
+    type: "short_text",
+  },
+  {
+    id: "gross_margin_hurdle",
+    section: "Budget & Unit Economics",
+    prompt: "Minimum acceptable gross margin for the AI-driven line of business",
+    help: "Used to stress-test cost-per-inference against margin compression.",
+    type: "short_text",
+  },
+
+  // ────────────────── Success Criteria & KPIs ──────────────────
+  {
+    id: "primary_kpi",
+    section: "Success Criteria",
+    prompt: "What does success look like in metrics terms?",
+    help: "Multiple allowed. These become the yardstick the report benchmarks against.",
+    type: "multi",
+    options: [
+      "Cost reduction in $ or %",
+      "Revenue uplift in $ or %",
+      "Cycle time reduction",
+      "Quality / accuracy lift",
+      "Customer retention (NDR / GRR)",
+      "Compliance / risk reduction",
+      "Competitive parity / catch-up",
+      "Exit multiple expansion",
+    ],
+  },
+  {
+    id: "measurable_targets",
+    section: "Success Criteria",
+    prompt: "Named baselines and targets",
+    help: "e.g. 'reduce average claim-handling time from 14 min to <5 min by Q4; increase NDR from 108% to 118% by year 2.' Concrete numbers let the report measure the gap.",
+    type: "long_text",
+  },
+  {
+    id: "kill_criteria",
+    section: "Success Criteria",
+    prompt: "What would cause you to reverse this decision?",
+    help: "Explicit kill conditions. Surfaced in the IC memo under 'what would kill this deal'.",
+    type: "long_text",
+  },
+
+  // ────────────────── Alternatives & Incumbents ──────────────────
+  {
+    id: "alternatives_considered",
+    section: "Alternatives & Incumbents",
+    prompt: "What alternatives are being weighed against this choice?",
+    type: "multi",
+    options: [
+      "Build in-house",
+      "Competing vendor / target",
+      "Status quo / do nothing",
+      "Open-source / DIY stack",
+      "Delay 6–12 months",
+      "Partial deployment / pilot first",
+    ],
+  },
+  {
+    id: "alternatives_detail",
+    section: "Alternatives & Incumbents",
+    prompt: "Name the specific competitors, vendors, or internal teams on the short list",
+    type: "long_text",
+  },
+  {
+    id: "switching_cost_from_incumbent",
+    section: "Alternatives & Incumbents",
+    prompt: "Switching cost from the current incumbent (if replacing one)",
+    type: "scale",
+    scale_min: 1,
+    scale_max: 5,
+    scale_labels: ["Trivial / no incumbent", "Extremely painful"],
+  },
+  {
+    id: "lock_in_tolerance",
+    section: "Alternatives & Incumbents",
+    prompt: "Tolerance for vendor lock-in",
+    type: "single",
+    options: [
+      "Must avoid all lock-in (open standards only)",
+      "Acceptable with documented exit plan",
+      "Acceptable — strategic partner posture",
+      "Lock-in preferred (deeper integration)",
+    ],
+  },
+
+  // ────────────────── Internal AI Readiness ──────────────────
+  {
+    id: "in_house_ml_talent",
+    section: "Internal AI Readiness",
+    prompt: "Depth of in-house ML / data-science talent (buyer side)",
+    type: "scale",
+    scale_min: 1,
+    scale_max: 5,
+    scale_labels: ["None", "Mature ML org"],
+  },
+  {
+    id: "data_readiness",
+    section: "Internal AI Readiness",
+    prompt: "Data platform maturity on the buyer side",
+    type: "single",
+    options: [
+      "No central data platform — siloed systems",
+      "Partial data lake / warehouse",
+      "Unified data platform with governance",
+      "Real-time data products with lineage",
+      "Not applicable (pure PE deal)",
+    ],
+  },
+  {
+    id: "change_management_risk",
+    section: "Internal AI Readiness",
+    prompt: "Change-management / adoption risk",
+    help: "How much will the end-user workflow need to change and how resistant is the org?",
+    type: "scale",
+    scale_min: 1,
+    scale_max: 5,
+    scale_labels: ["Low — slots into existing flow", "High — org rewire required"],
+  },
+  {
+    id: "existing_ai_systems",
+    section: "Internal AI Readiness",
+    prompt: "AI systems already deployed in the buyer's environment",
+    type: "multi",
+    options: [
+      "Microsoft 365 Copilot / Gemini / ChatGPT Enterprise",
+      "Internal RAG / knowledge assistant",
+      "Classical ML models in production",
+      "Agentic workflows in production",
+      "Vendor-provided AI in core products (CRM, ticketing, etc.)",
+      "None yet",
+      "Not applicable",
+    ],
+  },
+
+  // ────────────────── Target / Vendor Profile ──────────────────
   {
     id: "ai_maturity_perception",
     section: "Target Profile",
-    prompt:
-      "How AI-mature does the target appear based on public positioning?",
+    prompt: "How AI-mature does the target / vendor appear based on public positioning?",
     type: "scale",
     scale_min: 1,
     scale_max: 5,
@@ -100,12 +383,12 @@ const CORE_INTAKE_QUESTIONS: IntakeQuestion[] = [
   {
     id: "known_vendors",
     section: "Target Profile",
-    prompt: "Known vendor or model dependencies (if already disclosed)",
+    prompt: "Known vendor or model dependencies (if disclosed)",
     help: "Comma-separated. Pre-fills if mentioned in uploaded docs.",
     type: "short_text",
   },
 
-  // Regulatory
+  // ────────────────── Regulatory Lens ──────────────────
   {
     id: "regulatory_exposure",
     section: "Regulatory Lens",
@@ -121,6 +404,8 @@ const CORE_INTAKE_QUESTIONS: IntakeQuestion[] = [
       "EU AI Act",
       "FedRAMP",
       "PCI DSS",
+      "FCRA / ECOA",
+      "COPPA",
       "None material",
     ],
   },
@@ -140,7 +425,86 @@ const CORE_INTAKE_QUESTIONS: IntakeQuestion[] = [
     ],
   },
 
-  // Red flag priors
+  // ────────────────── Data Rights & IP Posture ──────────────────
+  {
+    id: "training_data_sources",
+    section: "Data Rights & IP",
+    prompt: "Where does training / grounding data come from?",
+    type: "multi",
+    options: [
+      "First-party customer data with explicit rights",
+      "Third-party licensed datasets",
+      "Public web scraping / crawl",
+      "Open datasets (creative commons, etc.)",
+      "Synthetic data generation",
+      "Partner data shared under NDA",
+      "Unknown / undocumented",
+    ],
+  },
+  {
+    id: "customer_data_usage_rights",
+    section: "Data Rights & IP",
+    prompt: "How are customer data usage rights structured?",
+    type: "single",
+    options: [
+      "Explicit opt-in, documented in MSA",
+      "Contractual default-in with opt-out",
+      "Aggregated / anonymized only",
+      "Ambiguous / not documented",
+      "Not applicable",
+    ],
+  },
+  {
+    id: "ip_indemnification_needed",
+    section: "Data Rights & IP",
+    prompt: "IP indemnification from the vendor",
+    type: "single",
+    options: [
+      "Required — unlimited or high cap",
+      "Required — limited cap acceptable",
+      "Preferred but not a gating item",
+      "Not material to this deal",
+    ],
+  },
+
+  // ────────────────── Operational Resilience ──────────────────
+  {
+    id: "business_continuity_requirement",
+    section: "Operational Resilience",
+    prompt: "Maximum tolerable AI-system downtime",
+    type: "single",
+    options: [
+      "Minutes (safety-critical / real-time)",
+      "Hours",
+      "1 business day",
+      "<1 week",
+      "Flexible — batch workflows",
+    ],
+  },
+  {
+    id: "data_exit_plan",
+    section: "Operational Resilience",
+    prompt: "Maturity of a vendor-exit / data-portability plan",
+    type: "scale",
+    scale_min: 1,
+    scale_max: 5,
+    scale_labels: ["None", "Fully documented + tested"],
+  },
+  {
+    id: "multi_region_requirement",
+    section: "Operational Resilience",
+    prompt: "Multi-region / data-residency requirement",
+    type: "single",
+    options: [
+      "US-only is acceptable",
+      "US + EU required",
+      "US + EU + APAC required",
+      "Country-specific residency required (name below)",
+      "Not applicable",
+    ],
+  },
+
+  // ────────────────── Red Flag Priors ──────────────────
   {
     id: "red_flag_priors",
     section: "Red Flag Priors",
@@ -157,26 +521,72 @@ const CORE_INTAKE_QUESTIONS: IntakeQuestion[] = [
       "Open-source license exposure",
       "IP / training-data provenance",
       "Competitive displacement",
+      "Team / hiring velocity",
+      "Benchmark cherry-picking",
     ],
   },
   {
     id: "client_risk_appetite",
     section: "Red Flag Priors",
-    prompt: "Client's risk appetite for AI-specific exposure",
+    prompt: "Risk appetite for AI-specific exposure",
     type: "scale",
     scale_min: 1,
     scale_max: 5,
     scale_labels: ["Very conservative", "Aggressive / contrarian"],
   },
 
-  // Free-form
+  // ────────────────── Prior Evidence / Artifacts ──────────────────
+  {
+    id: "artifacts_received",
+    section: "Artifacts Received",
+    prompt: "What has already been provided to the diligence team?",
+    help: "Select all that apply — drives the coverage gap analysis.",
+    type: "multi",
+    options: [
+      "Pitch deck / investor materials",
+      "Architecture documentation",
+      "SOC 2 / ISO 27001 report",
+      "Penetration test summary",
+      "Data handling / privacy policy",
+      "Model / AI system documentation",
+      "Financial statements / unit economics",
+      "Sample customer contracts / MSA",
+      "Incident log / post-mortems",
+      "Benchmark / evaluation results",
+      "Vendor dependency list",
+      "Reference customer calls (notes)",
+    ],
+  },
+  {
+    id: "gaps_already_known",
+    section: "Artifacts Received",
+    prompt: "Artifacts you already know are missing or thin",
+    help: "Free-form. Gets flagged as a coverage gap from turn one.",
+    type: "long_text",
+  },
+  {
+    id: "diligence_team_composition",
+    section: "Artifacts Received",
+    prompt: "Who is on the diligence team?",
+    type: "multi",
+    options: [
+      "Technical / architecture reviewer",
+      "Legal / regulatory reviewer",
+      "Finance / commercial reviewer",
+      "Operating partner / functional expert",
+      "External advisors engaged",
+      "Solo operator (just you)",
+    ],
+  },
+
+  // ────────────────── Free-form ──────────────────
   {
     id: "context_notes",
     section: "Context & Notes",
     prompt:
       "Anything the Kaptrix team should know before reading the data room?",
     help:
-      "Free-form. Any pre-meeting intel, political sensitivities, or prior diligence context.",
+      "Pre-meeting intel, political sensitivities, prior diligence context, known biases in the seller's narrative.",
     type: "long_text",
   },
 ];
@@ -480,20 +890,20 @@ const INDUSTRY_INTAKE_QUESTIONS: Record<Industry, IntakeQuestion[]> = {
 type Answers = Record<string, string | number | string[]>;
 
 interface Props {
+  /** Industry profile is locked at client creation — treated as a
+   *  required, read-only prop here. Swapping mid-engagement would
+   *  invalidate industry-specific intake answers and scoring weights. */
+  industry: Industry;
   initialAnswers?: Answers;
   onChange?: (answers: Answers) => void;
-  defaultIndustry?: Industry;
-  onIndustryChange?: (industry: Industry) => void;
 }
 
 export function IntakeQuestionnaire({
+  industry,
   initialAnswers = {},
   onChange,
-  defaultIndustry = "legal_tech",
-  onIndustryChange,
 }: Props) {
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
-  const [industry, setIndustry] = useState<Industry>(defaultIndustry);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   const profile = INDUSTRY_PROFILES[industry];
@@ -544,21 +954,29 @@ export function IntakeQuestionnaire({
           </div>
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium text-slate-700">Profile</label>
-            <select
-              value={industry}
-              onChange={(e) => {
-                const next = e.target.value as Industry;
-                setIndustry(next);
-                onIndustryChange?.(next);
-              }}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm focus:border-slate-900 focus:outline-none"
+            <div
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm"
+              title="Profile is set at client creation and locked for the lifetime of the engagement."
+              aria-label="Industry profile (locked)"
             >
-              {INDUSTRY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              <span>{profile.label}</span>
+              <span className="flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-3 w-3"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 1a4 4 0 0 0-4 4v3H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1V5a4 4 0 0 0-4-4Zm2 7V5a2 2 0 1 0-4 0v3h4Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Locked
+              </span>
+            </div>
           </div>
         </div>
 

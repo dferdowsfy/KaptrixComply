@@ -65,6 +65,37 @@ export interface IntakePayload {
   regulatory_exposure: string[];
   diligence_priorities: string[];
   red_flag_priors: string[];
+  // Optional expanded fields from the 14-section intake. All optional so
+  // older payloads stored in localStorage stay backward-compatible.
+  engagement_type?: string;
+  buyer_archetype?: string;
+  buyer_industry?: string;
+  target_size_usd?: string;
+  investment_size_usd?: string;
+  annual_run_rate_usd?: string;
+  decision_horizon_days?: string;
+  deal_thesis?: string[];
+  deal_stage?: string;
+  internal_sponsor_role?: string;
+  dissenting_voices?: string[];
+  approval_path?: string;
+  primary_kpi?: string[];
+  measurable_targets?: string;
+  kill_criteria?: string;
+  alternatives_considered?: string[];
+  alternatives_detail?: string;
+  lock_in_tolerance?: string;
+  existing_ai_systems?: string[];
+  data_readiness?: string;
+  training_data_sources?: string[];
+  customer_data_usage_rights?: string;
+  ip_indemnification_needed?: string;
+  business_continuity_requirement?: string;
+  multi_region_requirement?: string;
+  artifacts_received?: string[];
+  gaps_already_known?: string;
+  diligence_team_composition?: string[];
+  context_notes?: string;
 }
 
 export interface CoveragePayload {
@@ -356,18 +387,45 @@ export function formatKnowledgeBaseEvidence(
     lines.push(`[knowledge base · ${label}] ${entry.summary}`);
     const p = entry.payload;
     if (p.kind === "intake") {
-      if (p.regulatory_exposure.length)
-        lines.push(
-          `[knowledge base · Intake · regulatory exposure] ${p.regulatory_exposure.join(", ")}`,
-        );
-      if (p.diligence_priorities.length)
-        lines.push(
-          `[knowledge base · Intake · diligence priorities] ${p.diligence_priorities.join(", ")}`,
-        );
-      if (p.red_flag_priors.length)
-        lines.push(
-          `[knowledge base · Intake · red flag priors] ${p.red_flag_priors.join(", ")}`,
-        );
+      const emitList = (label: string, arr: string[] | undefined) => {
+        if (arr && arr.length)
+          lines.push(`[knowledge base · Intake · ${label}] ${arr.join(", ")}`);
+      };
+      const emitVal = (label: string, v: string | undefined) => {
+        if (v && v.trim()) lines.push(`[knowledge base · Intake · ${label}] ${v}`);
+      };
+      emitList("regulatory exposure", p.regulatory_exposure);
+      emitList("diligence priorities", p.diligence_priorities);
+      emitList("red flag priors", p.red_flag_priors);
+      emitVal("engagement type", p.engagement_type);
+      emitVal("buyer archetype", p.buyer_archetype);
+      emitVal("buyer industry", p.buyer_industry);
+      emitVal("target size (USD)", p.target_size_usd);
+      emitVal("investment size (USD)", p.investment_size_usd);
+      emitVal("annual run-rate AI spend (USD)", p.annual_run_rate_usd);
+      emitVal("decision horizon (days)", p.decision_horizon_days);
+      emitList("deal thesis", p.deal_thesis);
+      emitVal("deal stage", p.deal_stage);
+      emitVal("internal sponsor role", p.internal_sponsor_role);
+      emitList("dissenting voices", p.dissenting_voices);
+      emitVal("approval path", p.approval_path);
+      emitList("primary KPI", p.primary_kpi);
+      emitVal("measurable targets", p.measurable_targets);
+      emitVal("kill criteria", p.kill_criteria);
+      emitList("alternatives considered", p.alternatives_considered);
+      emitVal("alternatives detail", p.alternatives_detail);
+      emitVal("lock-in tolerance", p.lock_in_tolerance);
+      emitList("existing AI systems", p.existing_ai_systems);
+      emitVal("data platform readiness", p.data_readiness);
+      emitList("training data sources", p.training_data_sources);
+      emitVal("customer data usage rights", p.customer_data_usage_rights);
+      emitVal("IP indemnification need", p.ip_indemnification_needed);
+      emitVal("business continuity requirement", p.business_continuity_requirement);
+      emitVal("multi-region requirement", p.multi_region_requirement);
+      emitList("artifacts received", p.artifacts_received);
+      emitVal("known artifact gaps", p.gaps_already_known);
+      emitList("diligence team", p.diligence_team_composition);
+      emitVal("context notes", p.context_notes);
       lines.push(
         `[knowledge base · Intake · answered fields] ${p.answered_fields}`,
       );
