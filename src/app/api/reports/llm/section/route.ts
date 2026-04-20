@@ -89,7 +89,7 @@ function buildContextFromSnapshot(
       `[document] ${d.filename} (${d.category}, status: ${d.parse_status})`,
     );
   });
-  return parts.join("\n").slice(0, 70_000);
+  return parts.join("\n").slice(0, 110_000);
 }
 
 export async function POST(req: Request) {
@@ -154,18 +154,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const kbText = (body.knowledge_base ?? "").slice(0, 20_000);
+  const kbText = (body.knowledge_base ?? "").slice(0, 24_000);
   const combinedEvidence = kbText
     ? `${evidence}\n\n--- OPERATOR-SUBMITTED KNOWLEDGE BASE ---\n${kbText}`.slice(
         0,
-        90_000,
+        130_000,
       )
     : evidence;
 
   // Trim prior markdown so we never blow past the model's context.
   // Keep the tail (most recent sections) since coherence usually
   // depends on what was just written.
-  const prior = (body.prior_markdown ?? "").slice(-12_000);
+  const prior = (body.prior_markdown ?? "").slice(-16_000);
 
   const userPrompt = `${config.userPromptIntro}
 
