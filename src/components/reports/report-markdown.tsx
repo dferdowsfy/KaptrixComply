@@ -51,7 +51,8 @@ export interface SnapshotData {
 }
 
 function parseBlocks(src: string): Block[] {
-  const lines = src.replace(/\r\n?/g, "\n").split("\n");
+  const normalized = normalizeCollapsedTables(src);
+  const lines = normalized.replace(/\r\n?/g, "\n").split("\n");
   const blocks: Block[] = [];
   let i = 0;
   let h2Counter = 0;
@@ -118,7 +119,7 @@ function parseBlocks(src: string): Block[] {
     }
 
     // Table
-    if (line.includes("|") && i + 1 < lines.length && /^\s*\|?[\s:-]+\|[\s:-|]+$/.test(lines[i + 1])) {
+    if (line.includes("|") && i + 1 < lines.length && isTableSeparatorLine(lines[i + 1])) {
       const header = splitTableRow(line);
       const alignLine = splitTableRow(lines[i + 1]);
       const align = alignLine.map<"left" | "right" | "center">((c) => {
@@ -183,7 +184,7 @@ function parseBlocks(src: string): Block[] {
       if (/^\s*\d+\.\s+/.test(l)) break;
       if (/^\s*>\s?/.test(l)) break;
       if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(l)) break;
-      if (l.includes("|") && i + 1 < lines.length && /^\s*\|?[\s:-]+\|[\s:-|]+$/.test(lines[i + 1])) break;
+      if (l.includes("|") && i + 1 < lines.length && isTableSeparatorLine(lines[i + 1])) break;
       paraBuf.push(l.trim());
       i++;
     }
@@ -191,6 +192,96 @@ function parseBlocks(src: string): Block[] {
   }
 
   return blocks;
+}
+
+function isTableSeparatorLine(line: string): boolean {
+  return /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*$/.test(line);
+}
+
+function normalizeCollapsedTables(src: string): string {
+  const lines = src.replace(/\r\n?/g, "\n").split("\n");
+  const out: string[] = [];
+
+  for (const rawLine of lines) {
+    const expanded = expandCollapsedTableLine(rawLine);
+    if (expanded) out.push(...expanded);
+    else out.push(rawLine);
+  }
+
+  return out.join("\n");
+}
+
+function expandCollapsedTableLine(rawLine: string): string[] | null {
+  const line = rawLine.trimEnd();
+  if (!line.includes("|") || !line.includes("---")) return null;
+
+  const firstPipe = line.indexOf("|");
+  if (firstPipe < 0) return null;
+
+  const prefix = line.slice(0, firstPipe).trimEnd();
+  const tableChunk = line.slice(firstPipe).trim();
+
+  // Only attempt recovery when multiple table rows were collapsed onto
+  // one physical line (e.g. "... | col | | --- | ...").
+  if (!/\|\s+\|/.test(tableChunk)) return null;
+
+  const rows = splitCollapsedTableRows(tableChunk);
+  if (!rows || rows.length < 2) return null;
+  if (!isTableSeparatorLine(rows[1])) return null;
+
+  const headerCols = splitTableRow(rows[0]).length;
+  if (headerCols < 2) return null;
+
+  // Guard against accidental false positives.
+  for (const row of rows) {
+    if (splitTableRow(row).length !== headerCols) return null;
+  }
+
+  return prefix ? [prefix, ...rows] : rows;
+}
+
+function splitCollapsedTableRows(chunk: string): string[] | null {
+  if (!chunk.startsWith("|")) return null;
+
+  // Find boundary between header and separator row in one-line table text.
+  const headerBoundary = chunk.search(/\|\s+(?=\|\s*:?-{3,})/);
+  if (headerBoundary < 0) return null;
+
+  const header = chunk.slice(0, headerBoundary + 1).trim();
+  const colCount = splitTableRow(header).length;
+  if (colCount < 2) return null;
+
+  const rows: string[] = [header];
+  let rest = chunk.slice(headerBoundary + 1).trimStart();
+  const pipesPerRow = colCount + 1;
+
+  while (rest.startsWith("|")) {
+    const next = takeRowByPipeCount(rest, pipesPerRow);
+    if (!next) break;
+    rows.push(next.row);
+    if (next.rest === rest) break;
+    rest = next.rest.trimStart();
+  }
+
+  return rows.length >= 2 ? rows : null;
+}
+
+function takeRowByPipeCount(
+  s: string,
+  pipesNeeded: number,
+): { row: string; rest: string } | null {
+  let pipes = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    if (s[i] !== "|") continue;
+    pipes += 1;
+    if (pipes === pipesNeeded) {
+      return {
+        row: s.slice(0, i + 1).trim(),
+        rest: s.slice(i + 1),
+      };
+    }
+  }
+  return null;
 }
 
 function splitTableRow(line: string): string[] {

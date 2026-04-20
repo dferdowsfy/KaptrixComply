@@ -9,6 +9,7 @@ import { isSelfHostedLlmConfigured, getSelfHostedLlmModelForTask, isOpenRouterCo
 import { llmChat } from "@/lib/llm/client";
 import { openRouterChat, OPENROUTER_REPORT_MODEL } from "@/lib/llm/openrouter";
 import { getPreviewSnapshot } from "@/lib/preview/data";
+import { buildReportEvidenceContext } from "@/lib/reports/context";
 import {
   getAdvancedReportConfig,
   buildUpdateSystemPrompt,
@@ -34,68 +35,9 @@ interface Body {
   existing_report?: string;
 }
 
-function buildContextFromSnapshot(
-  snapshot: Awaited<ReturnType<typeof getPreviewSnapshot>>,
-): string {
-  const parts: string[] = [];
-  parts.push(
-    `ENGAGEMENT: target=${snapshot.engagement.target_company_name}, client=${snapshot.engagement.client_firm_name}, deal_stage=${snapshot.engagement.deal_stage}, tier=${snapshot.engagement.tier}.`,
-  );
-  snapshot.knowledgeInsights.forEach((k) => {
-    parts.push(`[${k.source_document}] ${k.insight} — excerpt: ${k.excerpt}`);
-  });
-  snapshot.analyses.forEach((a) => {
-    a.extracted_claims.forEach((c) => {
-      parts.push(`[${c.source_doc} ${c.source_location}] claim: ${c.claim}`);
-    });
-    a.red_flags.forEach((f) => {
-      parts.push(
-        `[red flag · ${f.severity} · ${f.dimension}] ${f.flag} — ${f.evidence}`,
-      );
-    });
-    a.regulatory_signals.forEach((r) => {
-      parts.push(
-        `[regulatory · ${r.exposure_level}] ${r.regulation} — ${r.relevance}`,
-      );
-    });
-    a.open_questions.forEach((q) => parts.push(`[open question] ${q}`));
-    a.vendor_dependencies.forEach((v) => parts.push(`[vendor] ${v}`));
-    a.model_dependencies.forEach((m) => parts.push(`[model] ${m}`));
-  });
-  parts.push(
-    `[executive summary] ${snapshot.executiveReport.executive_summary}`,
-  );
-  parts.push(
-    `[strategic context] ${snapshot.executiveReport.strategic_context}`,
-  );
-  snapshot.executiveReport.critical_findings.forEach((f) => {
-    parts.push(
-      `[finding · ${f.severity}] ${f.title}. ${f.what_we_found}. Why it matters: ${f.why_it_matters}. Evidence: ${f.operator_evidence}`,
-    );
-  });
-  snapshot.executiveReport.recommended_conditions.forEach((c) => {
-    parts.push(`[condition] ${c.condition} (owner ${c.owner}). ${c.rationale}`);
-  });
-  snapshot.executiveReport.value_creation_levers.forEach((l) => {
-    parts.push(`[value lever · ${l.time_horizon}] ${l.lever} — ${l.thesis}`);
-  });
-  snapshot.executiveReport.risk_heat_map.forEach((r) => {
-    parts.push(
-      `[risk · ${r.category}] ${r.risk} (likelihood ${r.likelihood}, impact ${r.impact})`,
-    );
-  });
-  snapshot.scores.forEach((s) => {
-    parts.push(
-      `[score · ${s.dimension}/${s.sub_criterion}] ${s.score_0_to_5.toFixed(1)} — ${s.operator_rationale}`,
-    );
-  });
-  snapshot.documents.forEach((d) => {
-    parts.push(
-      `[document] ${d.filename} (${d.category}, status: ${d.parse_status})`,
-    );
-  });
-  return parts.join("\n").slice(0, 110_000);
-}
+// Context assembly is now handled by the shared builder in
+// @/lib/reports/context — keep this route thin so every data source
+// flows into both report routes uniformly.
 
 export async function POST(req: Request) {
   let body: Body;
@@ -147,7 +89,7 @@ export async function POST(req: Request) {
   let clientName = "";
   try {
     const snapshot = await getPreviewSnapshot(clientId);
-    evidence = buildContextFromSnapshot(snapshot);
+    evidence = buildReportEvidenceContext(snapshot, { maxChars: 110_000 });
     targetName = snapshot.engagement.target_company_name;
     clientName = snapshot.engagement.client_firm_name;
   } catch (err) {
