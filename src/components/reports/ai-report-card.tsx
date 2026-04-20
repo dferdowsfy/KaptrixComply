@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AdvancedReportConfig } from "@/lib/reports/advanced-reports";
 import {
   ReportMarkdown,
@@ -77,6 +77,50 @@ export function AiReportCard({
     setTimeout(() => URL.revokeObjectURL(url), 1_000);
   }, [result]);
 
+  // --- Email report ---
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<
+    { type: "success" | "error"; message: string } | null
+  >(null);
+
+  const sendEmail = useCallback(async () => {
+    if (!result?.content || !emailTo.trim()) return;
+    setEmailSending(true);
+    setEmailStatus(null);
+
+    try {
+      const reportHtml = markdownToExportHtml(result.content);
+      const res = await fetch("/api/reports/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: emailTo.trim(),
+          reportTitle: result.title || config.title,
+          reportHtml,
+          target: result.target || target,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setEmailStatus({ type: "error", message: data.error || "Failed to send" });
+      } else {
+        setEmailStatus({ type: "success", message: `Sent to ${emailTo.trim()}` });
+        setEmailTo("");
+        setTimeout(() => {
+          setEmailModalOpen(false);
+          setEmailStatus(null);
+        }, 2000);
+      }
+    } catch {
+      setEmailStatus({ type: "error", message: "Network error" });
+    } finally {
+      setEmailSending(false);
+    }
+  }, [result, emailTo, config.title, target]);
+
   const rendered = useMemo(
     () =>
       result?.content ? <ReportMarkdown source={result.content} /> : null,
@@ -137,6 +181,13 @@ export function AiReportCard({
                 className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 Export DOCX
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEmailModalOpen(true); setEmailStatus(null); }}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Email report
               </button>
               <span className="ml-auto text-[11px] text-slate-500">
                 Saved · generated{" "}
@@ -226,6 +277,18 @@ export function AiReportCard({
           </div>
         )}
       </div>
+
+      {/* Email modal */}
+      {emailModalOpen && (
+        <EmailModal
+          to={emailTo}
+          setTo={setEmailTo}
+          sending={emailSending}
+          status={emailStatus}
+          onSend={sendEmail}
+          onClose={() => { setEmailModalOpen(false); setEmailStatus(null); }}
+        />
+      )}
     </article>
   );
 }
@@ -253,6 +316,84 @@ function Chevron({ expanded }: { expanded: boolean }) {
     >
       <polyline points="6 8 10 12 14 8" />
     </svg>
+  );
+}
+
+function EmailModal({
+  to,
+  setTo,
+  sending,
+  status,
+  onSend,
+  onClose,
+}: {
+  to: string;
+  setTo: (v: string) => void;
+  sending: boolean;
+  status: { type: "success" | "error"; message: string } | null;
+  onSend: () => void;
+  onClose: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+        <h3 className="text-lg font-bold text-slate-900">Email this report</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          The report will be sent from hello@kaptrix.com with your name in the subject line.
+        </p>
+
+        <label htmlFor="email-to" className="mt-4 block text-sm font-medium text-slate-700">
+          Recipient email
+        </label>
+        <input
+          ref={inputRef}
+          id="email-to"
+          type="email"
+          required
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="recipient@firm.com"
+          className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && to.trim()) onSend();
+          }}
+        />
+
+        {status && (
+          <p
+            className={`mt-3 text-sm font-medium ${
+              status.type === "success" ? "text-emerald-700" : "text-rose-700"
+            }`}
+          >
+            {status.message}
+          </p>
+        )}
+
+        <div className="mt-5 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={sending || !to.trim()}
+            className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-slate-800 disabled:opacity-50"
+          >
+            {sending ? "Sending..." : "Send"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

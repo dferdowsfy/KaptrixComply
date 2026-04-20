@@ -35,6 +35,8 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
+  const [confirmationSent, setConfirmationSent] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState("");
   const supabaseConfigured = isSupabaseConfigured();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,6 +71,7 @@ function LoginForm() {
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/api/auth/callback`,
           data: {
             full_name: fullName.trim(),
             firm_name: firmName.trim(),
@@ -81,11 +84,8 @@ function LoginForm() {
       if (error) {
         setMessage(error.message);
       } else {
-        setMessage(
-          "Account created — if email confirmation is required, check your inbox. Otherwise, log in below.",
-        );
-        setIsSignUp(false);
-        setPassword("");
+        setConfirmationEmail(email);
+        setConfirmationSent(true);
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({
@@ -106,6 +106,62 @@ function LoginForm() {
 
   const inputClass =
     "mt-1 block w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-white shadow-sm placeholder:text-white/40 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/40";
+
+  if (confirmationSent) {
+    return (
+      <div className="space-y-6 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/20 to-fuchsia-500/20 ring-1 ring-indigo-400/30">
+          <svg className="h-8 w-8 text-indigo-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+          </svg>
+        </div>
+
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight text-white">
+            Check your email
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-white/60">
+            We sent a confirmation link to<br />
+            <span className="font-medium text-white/90">{confirmationEmail}</span>
+          </p>
+          <p className="mt-4 text-sm text-white/50">
+            Click the link in the email to activate your account. It may take a minute to arrive.
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+          <p className="text-xs text-white/50">
+            Not seeing it? Check your spam folder or{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmationSent(false);
+                setConfirmationEmail("");
+                setMessage("");
+              }}
+              className="font-medium text-indigo-300 hover:text-indigo-200 hover:underline"
+            >
+              try again
+            </button>
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setConfirmationSent(false);
+            setConfirmationEmail("");
+            setIsSignUp(false);
+            setMessage("");
+            setPassword("");
+          }}
+          className="text-sm font-medium text-white/70 hover:text-white hover:underline"
+        >
+          Back to log in
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
