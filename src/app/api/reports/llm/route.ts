@@ -5,6 +5,7 @@ import { openRouterChat, OPENROUTER_REPORT_MODEL } from "@/lib/llm/openrouter";
 import { getPreviewSnapshot } from "@/lib/preview/data";
 import {
   getAdvancedReportConfig,
+  buildUpdateSystemPrompt,
   type AdvancedReportId,
 } from "@/lib/reports/advanced-reports";
 
@@ -15,6 +16,10 @@ interface Body {
   client_id: string;
   report_type: AdvancedReportId;
   knowledge_base?: string;
+  /** Full markdown of a previously-generated saved report. When present,
+   *  the LLM operates in update mode (REPORT_UPDATE_PROTOCOL) instead
+   *  of generating from scratch. */
+  existing_report?: string;
 }
 
 function buildContextFromSnapshot(
@@ -143,7 +148,31 @@ export async function POST(req: Request) {
       )
     : evidence;
 
-  const userPrompt = `${config.userPromptIntro}
+  const existingReport = (body.existing_report ?? "").slice(0, 48_000);
+  const isUpdateMode = existingReport.length > 0;
+
+  const systemPrompt = isUpdateMode
+    ? buildUpdateSystemPrompt(config.systemPrompt)
+    : config.systemPrompt;
+
+  const userPrompt = isUpdateMode
+    ? `${config.userPromptIntro} — UPDATE MODE
+
+TARGET: ${targetName}
+CLIENT: ${clientName}
+
+PRIOR REPORT (existing version — parse baseline state from this):
+"""
+${existingReport}
+"""
+
+NEW / UPDATED EVIDENCE (delta since prior report was generated):
+"""
+${combinedEvidence}
+"""
+
+Follow the REPORT UPDATE PROTOCOL. Return the updated report as clean markdown only. No preamble, no closing remarks, no code fences.`
+    : `${config.userPromptIntro}
 
 TARGET: ${targetName}
 CLIENT: ${clientName}
@@ -163,7 +192,7 @@ Return the report as clean markdown only. No preamble, no closing remarks, no co
       const resp = await openRouterChat({
         model: OPENROUTER_REPORT_MODEL,
         messages: [
-          { role: "system", content: config.systemPrompt },
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.2,
@@ -175,7 +204,7 @@ Return the report as clean markdown only. No preamble, no closing remarks, no co
       const resp = await llmChat({
         model: getSelfHostedLlmModelForTask("report"),
         messages: [
-          { role: "system", content: config.systemPrompt },
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.2,
@@ -200,6 +229,7 @@ Return the report as clean markdown only. No preamble, no closing remarks, no co
       report_type: reportType,
       title: config.title,
       content,
+      is_update: isUpdateMode,
       generated_at: new Date().toISOString(),
       target: targetName,
       client: clientName,

@@ -567,3 +567,110 @@ export function getAdvancedReportConfig(
 ): AdvancedReportConfig | null {
   return ADVANCED_REPORTS.find((r) => r.id === id) ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// REPORT UPDATE PROTOCOL
+// Injected as a system-prompt prefix whenever an existing report version is
+// supplied to the generation endpoint. Forces the model into versioned-update
+// mode instead of a from-scratch generation.
+// ---------------------------------------------------------------------------
+
+export const REPORT_UPDATE_PROTOCOL = `REPORT UPDATE PROTOCOL — YOU ARE UPDATING AN EXISTING REPORT, NOT WRITING A NEW ONE.
+
+You have been given:
+1. The PRIOR REPORT (existing version).
+2. NEW EVIDENCE (updated knowledge base, scores, and/or new artifacts).
+
+Your mandatory operating procedure is:
+
+STEP 1 — PARSE PRIOR STATE
+Extract from the prior report:
+- All prior claims and their confidence levels
+- All prior risk rankings and scores
+- All prior classifications (REAL / PARTIAL / ILLUSION, or equivalent)
+- The prior FINAL POSITION / verdict
+Treat these as the "baseline state". Never silently discard them.
+
+STEP 2 — EVIDENCE DELTA ANALYSIS
+For each new artifact or data point, tag it:
+- CONFIRMS: new evidence supports the prior claim
+- CONTRADICTS: new evidence opposes the prior claim
+- ADDS: new evidence introduces information not present before
+Never process new evidence without one of these three tags.
+
+STEP 3 — CLAIM REVALIDATION (CRITICAL)
+For EVERY prior claim, re-evaluate and assign:
+- VALIDATED — still holds under new evidence
+- WEAKENED — less certain; downgrade confidence and state why
+- INVALIDATED — no longer true; replace with updated claim and explain the exact mechanism of invalidation
+No claim may be silently dropped or silently changed.
+
+STEP 4 — CONTRADICTION RESOLUTION
+If new evidence conflicts with a prior conclusion:
+Label it: [CONTRADICTION DETECTED]
+Resolve using evidence hierarchy (direct measurement > vendor contract > management claim > inferred).
+State which side wins and why. No unresolved contradictions in the output.
+
+STEP 5 — SCORE & RANKING UPDATE
+Recalculate where new evidence changes the picture:
+- Risk scores (Severity × Likelihood)
+- Top risk rankings — show previous rank → new rank + reason
+- Value lever rankings — same format
+Show: Previous: #N → Updated: #M — [reason]
+
+STEP 6 — SECTION-LEVEL UPDATE DISCIPLINE
+When updating any section:
+- Add an [UPDATE NOTE] callout immediately after the section heading where content changed.
+- Format: > **[UPDATE NOTE]** — *What changed*: … | *Why*: … | *Impact*: …
+- If no material change to a section: add > **[NO CHANGE]** — prior analysis upheld.
+- Do NOT rewrite sections that have not changed. Quote the prior language and confirm it.
+- Do NOT regenerate the entire report unless >50% of claims are invalidated (if you do, state this threshold was crossed).
+
+STEP 7 — MANDATORY CHANGE LOG
+After the last report section, emit a fenced change log block:
+
+\`\`\`change-log
+Claims Updated:
+- [old claim] → [new claim]
+
+Risks Re-ranked:
+- [Risk Title]: #N → #M — [reason]
+
+New Risks Added:
+- [list or "None"]
+
+Invalidated Assumptions:
+- [list or "None"]
+
+Confidence Changes:
+- [Dimension]: [Old %] → [New %] — [reason]
+\`\`\`
+
+STEP 8 — FINAL POSITION UPDATE
+After the change log, emit:
+
+\`\`\`final-position
+PREVIOUS:
+  Classification: [prior verdict]
+  Conviction: [prior 0-100]
+  Primary Driver: [prior one-liner]
+
+UPDATED:
+  Classification: [new verdict or "No change"]
+  Conviction: [new 0-100 or "No change"]
+  Primary Driver: [new one-liner or "No change — prior position upheld"]
+\`\`\`
+
+STRICT RULES:
+- Every update is traceable — no anonymous overwrites.
+- Every invalidation is explained.
+- Every claim is either VALIDATED, WEAKENED, or INVALIDATED — never silently carried forward.
+- The output must be parseable as a versioned analytical document, not a fresh report.`;
+
+/**
+ * Wraps the base report system prompt with the update protocol when the
+ * operator is re-generating from an existing report version.
+ */
+export function buildUpdateSystemPrompt(basePrompt: string): string {
+  return `${REPORT_UPDATE_PROTOCOL}\n\n---\n\n${basePrompt}`;
+}
