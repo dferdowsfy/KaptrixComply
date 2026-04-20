@@ -15,6 +15,7 @@ export function ProfileMenu() {
   const router = useRouter();
   const supabaseConfigured = isSupabaseConfigured();
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -37,6 +38,24 @@ export function ProfileMenu() {
       sub.subscription.unsubscribe();
     };
   }, [supabaseConfigured]);
+
+  // Load is_admin flag so we can surface the Admin panel link.
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/user/profile", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setIsAdmin(Boolean(data.is_admin));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!open) return;
@@ -107,6 +126,12 @@ export function ProfileMenu() {
             <SettingsIcon className="h-4 w-4" />
             Account settings
           </MenuItem>
+          {isAdmin && (
+            <MenuItem href="/admin" onClick={() => setOpen(false)}>
+              <ShieldIcon className="h-4 w-4" />
+              Admin panel
+            </MenuItem>
+          )}
           <MenuItem href="/how-it-works" onClick={() => setOpen(false)}>
             <InfoIcon className="h-4 w-4" />
             How Kaptrix scores
@@ -182,6 +207,17 @@ function SignOutIcon({ className }: { className?: string }) {
       <path
         fillRule="evenodd"
         d="M3 3a1 1 0 011-1h8a1 1 0 011 1v2a1 1 0 11-2 0V4H5v12h6v-1a1 1 0 112 0v2a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm10.3 4.3a1 1 0 011.4 0l2 2a1 1 0 010 1.4l-2 2a1 1 0 01-1.4-1.4L14 10.5H8a1 1 0 110-2h6l-.7-.8a1 1 0 010-1.4z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden>
+      <path
+        fillRule="evenodd"
+        d="M10 1.5l7 2.5v6.2c0 4-2.9 7.4-7 8.3-4.1-.9-7-4.3-7-8.3V4l7-2.5zm-1 6.2v2.6a1 1 0 102 0V7.7a1 1 0 10-2 0zm0 6.3a1 1 0 112 0 1 1 0 01-2 0z"
         clipRule="evenodd"
       />
     </svg>

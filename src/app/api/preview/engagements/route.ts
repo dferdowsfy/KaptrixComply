@@ -24,23 +24,12 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  // Require authentication to create a new client
+  // Auth is enough — any signed-in user can create a new client.
   let ctx;
   try {
     ctx = await requireAuth();
   } catch (err) {
     return authErrorResponse(err);
-  }
-
-  // Only approved users can create new clients
-  if (!ctx.approved) {
-    return NextResponse.json(
-      {
-        error: "Your account has not yet been approved to create new clients. Please contact support.",
-        code: "not_approved",
-      },
-      { status: 403 },
-    );
   }
 
   const body = await request.json();

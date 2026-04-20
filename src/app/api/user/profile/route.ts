@@ -17,6 +17,8 @@ export async function GET() {
       email: ctx.email,
       role: ctx.role,
       approved: ctx.approved,
+      hidden_menu_keys: ctx.hidden_menu_keys,
+      is_admin: ctx.role === "admin",
     });
   } catch (err) {
     return authErrorResponse(err);

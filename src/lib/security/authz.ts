@@ -19,6 +19,7 @@ export interface AuthContext {
   email: string | null;
   role: AppRole | null;
   approved: boolean;
+  hidden_menu_keys: string[];
 }
 
 export class AuthError extends Error {
@@ -47,7 +48,7 @@ export async function requireAuth(): Promise<AuthContext> {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("role, email, approved")
+    .select("role, email, approved, hidden_menu_keys")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -57,12 +58,20 @@ export async function requireAuth(): Promise<AuthContext> {
     email: profile?.email ?? user.email ?? null,
     role: (profile?.role as AppRole | undefined) ?? null,
     approved: profile?.approved ?? false,
+    hidden_menu_keys: (profile?.hidden_menu_keys as string[] | undefined) ?? [],
   };
 }
 
 export function requireRole(ctx: AuthContext, allowed: AppRole[]): void {
   if (!ctx.role || !allowed.includes(ctx.role)) {
     throw new AuthError(403, "forbidden_role", "Insufficient role");
+  }
+}
+
+/** Admin-only guard. Throws 403 if the current user is not an admin. */
+export function requireAdmin(ctx: AuthContext): void {
+  if (ctx.role !== "admin") {
+    throw new AuthError(403, "forbidden_admin", "Admin access required");
   }
 }
 

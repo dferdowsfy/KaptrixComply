@@ -58,15 +58,20 @@ export default function ResetPasswordPage() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">Reset password</h2>
-        <p className="mt-1 text-sm text-gray-600">
+      <div className="text-center">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-indigo-200/80">
+          Secure update
+        </p>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+          Reset password
+        </h2>
+        <p className="mt-2 text-sm text-white/60">
           Choose a new password for your Kaptrix account.
         </p>
       </div>
 
       <div>
-        <label htmlFor="new-password" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="new-password" className="block text-sm font-medium text-white/80">
           New password
         </label>
         <input
@@ -76,13 +81,13 @@ export default function ResetPasswordPage() {
           minLength={8}
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 sm:text-sm"
+          className="mt-1 block w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-white shadow-sm placeholder:text-white/40 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
           placeholder="••••••••"
         />
       </div>
 
       <div>
-        <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="confirm-password" className="block text-sm font-medium text-white/80">
           Confirm password
         </label>
         <input
@@ -92,7 +97,7 @@ export default function ResetPasswordPage() {
           minLength={8}
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 sm:text-sm"
+          className="mt-1 block w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-white shadow-sm placeholder:text-white/40 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
           placeholder="••••••••"
         />
       </div>
@@ -100,16 +105,16 @@ export default function ResetPasswordPage() {
       <button
         type="submit"
         disabled={loading}
-        className="flex w-full justify-center rounded-md bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 disabled:opacity-60"
+        className="flex w-full justify-center rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-900/30 transition hover:from-indigo-400 hover:to-fuchsia-400 disabled:opacity-60"
       >
         {loading ? "Updating..." : "Update password"}
       </button>
 
-      {message && <p className="text-center text-sm text-emerald-700">{message}</p>}
-      {error && <p className="text-center text-sm text-rose-700">{error}</p>}
+      {message && <p className="text-center text-sm text-emerald-300">{message}</p>}
+      {error && <p className="text-center text-sm text-rose-300">{error}</p>}
 
-      <p className="text-center text-sm text-gray-600">
-        <Link href="/login" className="font-medium text-gray-900 hover:underline">
+      <p className="text-center text-sm text-white/60">
+        <Link href="/login" className="font-medium text-white/90 hover:text-white hover:underline">
           Back to log in
         </Link>
       </p>
