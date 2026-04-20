@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 // ---------------------------------------------------------------------------
-// Visual system (deliberately restrained — Stripe / Linear / Vanta, not crypto):
+// Visual system (deliberately restrained, Stripe / Linear / Vanta, not crypto):
 // - Primary CTA:  bg #0B0B1A, white text, hover #1F1F2E
 // - Secondary:    white bg, 1px #E5E7EB border, black text, hover #F9FAFB
 // - Accent:       indigo #6B5BFF used only for eyebrow labels and section borders
@@ -30,7 +30,7 @@ const SNAPSHOTS = [
   {
     kicker: "Layer 02",
     title: "Scoring layer",
-    description: "Deterministic dimensions with evidence links.",
+    description: "Structured dimensions with evidence links.",
     href: "/preview/scoring",
     accent: "from-slate-700/40 via-slate-700/20 to-transparent",
   },
@@ -46,7 +46,7 @@ const SNAPSHOTS = [
 const LAYERS = [
   {
     id: "01",
-    title: "Deterministic scoring engine",
+    title: "Structured scoring engine",
     body: "A fixed methodology where the same inputs always produce the same base score. No hidden model behavior.",
     pillar: "AI expands coverage, detects contradictions, and proposes bounded adjustments.",
   },
@@ -74,20 +74,20 @@ const JOURNEY = [
   {
     step: "02",
     title: "Upload the room",
-    lede: "CIMs, financials, contracts, customer calls — drop them in.",
+    lede: "CIMs, financials, contracts, customer calls, drop them in.",
     body: "Kaptrix parses, chunks, and embeds every document into a private vector index for that one client. Nothing leaks across firms, and nothing is thrown away.",
   },
   {
     step: "03",
     title: "Score with evidence",
-    lede: "Deterministic rubric. Every line traced to a quote.",
-    body: "The engine scores each dimension using the same rubric every time, while the RAG layer surfaces the exact passages that justify — or contradict — each claim.",
+    lede: "Consistent rubric. Every line traced to a quote.",
+    body: "The engine scores each dimension using the same rubric every time, while the RAG layer surfaces the exact passages that justify, or contradict, each claim.",
   },
   {
     step: "04",
     title: "The brain keeps learning",
     lede: "Every submission trains the client's own deal intelligence continuously.",
-    body: "New documents, adjustments, and investor rationale fold back into the client's knowledge base. Ask a question tomorrow and the brain answers with everything you've ever fed it — not a generic model.",
+    body: "New documents, adjustments, and investor rationale fold back into the client's knowledge base. Ask a question tomorrow and the brain answers with everything you've ever fed it, not a generic model.",
   },
   {
     step: "05",
@@ -98,7 +98,7 @@ const JOURNEY = [
 ];
 
 const MARQUEE = [
-  "Deterministic scoring",
+  "Structured scoring",
   "Evidence-backed AI",
   "Investor judgment",
   "Full audit trail",
@@ -125,21 +125,32 @@ export default function HomePage() {
       <PublicHeader />
 
       {/* ====================================================================
-          1. HERO — tightened, no boxed callout, flat dark background
+          1. HERO, deep-blue gradient + subtle glow
       ==================================================================== */}
-      <section className="relative overflow-hidden bg-[#0B0B1A] text-white">
+      <section className="relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,#1B1F4A_0%,#0D1033_35%,#0A0B1F_65%,#070815_100%)] text-white">
+        {/* ambient glow, kept subtle */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-indigo-500/20 blur-[100px]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-24 bottom-0 h-[18rem] w-[18rem] rounded-full bg-sky-500/10 blur-[100px]"
+        />
         <div className="relative mx-auto max-w-6xl px-6 pb-20 pt-28 sm:pt-32 lg:pb-28">
           <Reveal>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9B8CFF]">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-300">
               AI diligence, rebuilt
             </p>
             <h1 className="mt-6 max-w-4xl text-5xl font-light leading-[1.05] tracking-tight sm:text-6xl lg:text-[5.5rem] kx-fade-in">
               An AI brain
               <br />
-              <span className="text-white/70">for every deal.</span>
+              <span className="bg-gradient-to-r from-white via-indigo-100 to-indigo-300 bg-clip-text text-transparent">
+                for every deal.
+              </span>
             </h1>
-            <p className="mt-8 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
-              Technical diligence for AI investments — evidence-first,
+            <p className="mt-8 max-w-2xl text-lg leading-8 text-slate-100 sm:text-xl">
+              Technical diligence for AI investments. Evidence-first,
               committee-ready, and built to stand up to the scrutiny of real
               investment committees.
             </p>
@@ -147,7 +158,7 @@ export default function HomePage() {
               <Link href="/contact" className={BTN_PRIMARY_ON_DARK}>
                 Discuss an engagement
               </Link>
-              <Link href="#how-it-works" className={BTN_SECONDARY_ON_DARK}>
+              <Link href="/how-it-works" className={BTN_SECONDARY_ON_DARK}>
                 See how it works
               </Link>
             </div>
@@ -155,23 +166,23 @@ export default function HomePage() {
         </div>
 
         {/* Marquee strip */}
-        <div className="marquee relative border-t border-white/10 bg-[#0B0B1A] py-4">
+        <div className="marquee relative border-t border-white/10 bg-[#070815] py-4">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-gradient-to-r from-[#0B0B1A] to-transparent"
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-gradient-to-r from-[#070815] to-transparent"
           />
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-gradient-to-l from-[#0B0B1A] to-transparent"
+            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-gradient-to-l from-[#070815] to-transparent"
           />
-          <div className="marquee-track text-xs font-medium uppercase tracking-[0.32em] text-slate-500 sm:text-sm">
+          <div className="marquee-track text-xs font-medium uppercase tracking-[0.32em] text-slate-300 sm:text-sm">
             {MARQUEE.map((word, i) => (
               <span key={i} className="inline-flex items-center">
                 <span>{word}</span>
                 {i < MARQUEE.length - 1 && (
                   <span
                     aria-hidden
-                    className="ml-6 inline-block h-1 w-1 rounded-full bg-slate-600"
+                    className="ml-6 inline-block h-1 w-1 rounded-full bg-indigo-400/60"
                   />
                 )}
               </span>
@@ -181,7 +192,7 @@ export default function HomePage() {
       </section>
 
       {/* ====================================================================
-          2. OUR STORY — muted, prose, left-aligned 600px column
+          2. OUR STORY, muted, prose, left-aligned 600px column
       ==================================================================== */}
       <section className="border-b border-[#E5E7EB] bg-[#FAFAFA]">
         <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
@@ -194,10 +205,10 @@ export default function HomePage() {
                 We kept watching smart investors buy AI companies they
                 didn&apos;t fully understand.
               </h2>
-              <div className="mt-8 space-y-5 text-base leading-7 text-slate-700">
+              <div className="mt-8 space-y-5 text-base leading-7 text-slate-800">
                 <p>
                   Every year, billions flow into AI companies based on decks,
-                  demos, and founder conviction. We watched it happen — from
+                  demos, and founder conviction. We watched it happen, from
                   the inside. As AI builders, technical leaders, and advisors
                   to institutional investors, we kept seeing the same pattern:
                   brilliant investors writing large checks on AI systems whose
@@ -214,7 +225,7 @@ export default function HomePage() {
                 </p>
                 <p>
                   Kaptrix was built by people who have lived on both sides of
-                  this — shipping AI systems at scale, and being retained by
+                  this, shipping AI systems at scale, and being retained by
                   institutional investors to evaluate them. We built the
                   system we wished we had: evidence-first, traceable, and
                   specifically designed for the failure modes AI investments
@@ -223,7 +234,7 @@ export default function HomePage() {
                 <p>
                   As AI keeps advancing, the question isn&apos;t whether to
                   invest in it. The question is how to invest in it
-                  defensibly — with evidence, not narrative.
+                  defensibly, with evidence, not narrative.
                 </p>
                 <p className="font-medium text-[#0B0B1A]">
                   That&apos;s what Kaptrix is for.
@@ -238,14 +249,14 @@ export default function HomePage() {
         {/* ================================================================
             3. PLATFORM LAYERS (now folds in Decision Integrity points)
         ================================================================ */}
-        <section id="how-it-works" className="scroll-mt-24">
+        <section id="platform-layers" className="scroll-mt-24">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#6B5BFF]">
               Platform layers
             </p>
             <h2 className="mt-4 max-w-3xl text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
               One workflow.{" "}
-              <span className="text-slate-500">Three clear layers.</span>
+              <span className="text-slate-600">Three clear layers.</span>
             </h2>
           </Reveal>
 
@@ -257,17 +268,17 @@ export default function HomePage() {
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#E5E7EB] bg-[#FAFAFA] text-sm font-semibold text-[#0B0B1A]">
                       {layer.id}
                     </span>
-                    <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">
                       Layer
                     </span>
                   </div>
                   <h3 className="mt-5 text-xl font-medium tracking-tight text-[#0B0B1A]">
                     {layer.title}
                   </h3>
-                  <p className="mt-3 text-base leading-7 text-slate-600">
+                  <p className="mt-3 text-base leading-7 text-slate-700">
                     {layer.body}
                   </p>
-                  <p className="mt-6 border-t border-[#E5E7EB] pt-4 text-sm leading-6 text-slate-500">
+                  <p className="mt-6 border-t border-[#E5E7EB] pt-4 text-sm leading-6 text-slate-600">
                     {layer.pillar}
                   </p>
                 </article>
@@ -277,7 +288,7 @@ export default function HomePage() {
         </section>
 
         {/* ================================================================
-            4. DELIVERABLES — new section
+            4. DELIVERABLES, new section
         ================================================================ */}
         <section className="border-t border-[#E5E7EB] pt-24">
           <Reveal>
@@ -289,12 +300,12 @@ export default function HomePage() {
                 <h2 className="mt-4 text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
                   See what a Kaptrix engagement actually produces.
                 </h2>
-                <p className="mt-6 text-base leading-7 text-slate-600">
+                <p className="mt-6 text-base leading-7 text-slate-700">
                   Every engagement ends with committee-ready work product. A
                   ten-section Master Diligence Report. An IC memo with clear
                   recommendation. A technical risk register with mitigations.
                   A 100-day post-close plan. Built to survive the scrutiny of
-                  a real investment committee — and to leave a full audit
+                  a real investment committee, and to leave a full audit
                   trail when someone asks, 18 months later, what exactly was
                   reviewed.
                 </p>
@@ -305,7 +316,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* CSS-only stacked-document mock — no purple, no glow */}
+              {/* CSS-only stacked-document mock, no purple, no glow */}
               <div className="relative mx-auto h-[360px] w-full max-w-md">
                 <div className="absolute right-2 top-6 h-[300px] w-[230px] -rotate-3 rounded-md border border-[#E5E7EB] bg-white shadow-[0_20px_40px_-20px_rgba(11,11,26,0.18)]">
                   <div className="px-5 pt-6">
@@ -333,8 +344,8 @@ export default function HomePage() {
                     <p className="mt-2 text-base font-medium text-[#0B0B1A]">
                       Ten-section report
                     </p>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Confidential — Investor distribution only
+                    <p className="mt-1 text-[11px] text-slate-600">
+                      Confidential. Investor distribution only.
                     </p>
                     <div className="mt-5 grid grid-cols-2 gap-1.5">
                       {Array.from({ length: 10 }).map((_, i) => (
@@ -354,7 +365,7 @@ export default function HomePage() {
         </section>
 
         {/* ================================================================
-            5. PLATFORM SNAPSHOTS — desaturated stepper
+            5. PLATFORM SNAPSHOTS, desaturated stepper
         ================================================================ */}
         <section className="border-t border-[#E5E7EB] pt-24">
           <Reveal>
@@ -363,9 +374,9 @@ export default function HomePage() {
             </p>
             <h2 className="mt-4 max-w-3xl text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
               See the product{" "}
-              <span className="text-slate-500">in motion.</span>
+              <span className="text-slate-600">in motion.</span>
             </h2>
-            <p className="mt-6 max-w-2xl text-base leading-7 text-slate-600">
+            <p className="mt-6 max-w-2xl text-base leading-7 text-slate-700">
               Step through each layer of the platform. The preview advances on
               its own, or jump to a layer from the stepper.
             </p>
@@ -377,40 +388,46 @@ export default function HomePage() {
         </section>
 
         {/* ================================================================
-            6. DEAL BRAIN / RAG STORY — flat dark navy, no fuchsia
+            6. DEAL BRAIN, deep-blue gradient, subtle glow
         ================================================================ */}
-        <section className="overflow-hidden rounded-2xl bg-[#0B0B1A] p-8 text-white sm:p-14">
+        <section className="relative overflow-hidden rounded-2xl bg-[radial-gradient(ellipse_at_top_left,#1B1F4A_0%,#0D1033_40%,#0A0B1F_75%,#070815_100%)] p-8 text-white sm:p-14">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-20 -top-20 h-[22rem] w-[22rem] rounded-full bg-indigo-500/15 blur-[100px]"
+          />
           <Reveal>
-            <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9B8CFF]">
+            <div className="relative max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-300">
                 The deal intelligence engine
               </p>
               <h2 className="mt-4 text-3xl font-normal leading-[1.1] tracking-tight sm:text-5xl">
                 Every submission{" "}
-                <span className="text-white/70">trains your deal brain.</span>
+                <span className="bg-gradient-to-r from-white to-indigo-200 bg-clip-text text-transparent">
+                  trains your deal brain.
+                </span>
               </h2>
-              <p className="mt-6 text-base leading-7 text-slate-300 sm:text-lg">
-                Kaptrix is not a one-shot model. Each client gets its own
-                private RAG engine that gets sharper with every document,
-                adjustment, and investor note. The longer you work the deal,
-                the more useful the system becomes — only for you.
+              <p className="mt-6 text-base leading-7 text-slate-100 sm:text-lg">
+                Kaptrix is not a one-shot model. Each client gets a private
+                RAG engine that gets sharper with every document, adjustment,
+                and investor note. The longer you work the deal, the more
+                useful the system becomes, only for you.
               </p>
             </div>
           </Reveal>
 
-          {/* Timeline — single neutral rail, no rainbow gradients */}
+          {/* Timeline, single indigo rail */}
           <div className="relative mt-14">
             <div
               aria-hidden
-              className="pointer-events-none absolute left-5 top-2 bottom-2 w-px bg-white/10"
+              className="pointer-events-none absolute left-5 top-2 bottom-2 w-px bg-gradient-to-b from-indigo-400/40 via-white/10 to-transparent"
             />
-            <ol className="space-y-8">
+            <ol className="relative space-y-8">
               {JOURNEY.map((j, idx) => (
                 <Reveal key={j.step} delay={idx * 100}>
                   <li className="relative grid gap-4 lg:grid-cols-[3rem_1fr]">
                     <span
                       aria-hidden
-                      className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-md border border-white/15 bg-[#14142B] text-xs font-semibold text-white lg:static"
+                      className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-md border border-indigo-300/25 bg-[#14183A] text-xs font-semibold text-indigo-100 shadow-[0_0_0_1px_rgba(99,102,241,0.08)] lg:static"
                     >
                       {j.step}
                     </span>
@@ -418,10 +435,10 @@ export default function HomePage() {
                       <h3 className="text-lg font-medium text-white sm:text-xl">
                         {j.title}
                       </h3>
-                      <p className="mt-1 text-sm text-white/70 sm:text-base">
+                      <p className="mt-1 text-sm text-indigo-200 sm:text-base">
                         {j.lede}
                       </p>
-                      <p className="mt-3 text-sm leading-6 text-slate-400 sm:text-base">
+                      <p className="mt-3 text-sm leading-6 text-slate-200 sm:text-base">
                         {j.body}
                       </p>
                     </div>
@@ -433,7 +450,7 @@ export default function HomePage() {
 
           {/* Privacy callout */}
           <Reveal delay={120}>
-            <div className="mt-12 rounded-md border border-white/10 bg-white/[0.03] p-5 text-sm leading-6 text-slate-300">
+            <div className="relative mt-12 rounded-md border border-indigo-300/20 bg-white/[0.04] p-5 text-sm leading-6 text-slate-100">
               <p className="font-semibold text-white">Note on privacy.</p>
               <p className="mt-1">
                 Your submissions train <em>your</em> deal brain. Client data is
@@ -445,16 +462,17 @@ export default function HomePage() {
           </Reveal>
 
           <Reveal delay={150}>
-            <p className="mt-10 max-w-2xl text-sm leading-6 text-slate-400">
+            <p className="relative mt-10 max-w-2xl text-sm leading-6 text-slate-200">
               The loop continues across the life of the engagement: new
-              documents → fresh embeddings → updated scores → sharper answers.
+              documents feed fresh embeddings, embeddings sharpen the next
+              scoring pass, and every answer gets more specific to your book.
               Run it for one deal or a whole portfolio.
             </p>
           </Reveal>
         </section>
 
         {/* ================================================================
-            7. CLOSING — replaces "Trusted by investment committees"
+            7. CLOSING, replaces "Trusted by investment committees"
         ================================================================ */}
         <section className="border-t border-[#E5E7EB] pt-24">
           <Reveal>
@@ -465,9 +483,9 @@ export default function HomePage() {
               <h2 className="mt-4 text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
                 Built for how investment decisions actually get made.
               </h2>
-              <p className="mt-6 text-base leading-7 text-slate-600">
+              <p className="mt-6 text-base leading-7 text-slate-700">
                 Kaptrix is designed for investors who need defensible technical
-                diligence on AI companies — fast, evidence-backed, and
+                diligence on AI companies. Fast, evidence-backed, and
                 auditable. Every engagement produces committee-ready
                 deliverables with a full audit trail from artifact to score to
                 decision.
@@ -476,7 +494,7 @@ export default function HomePage() {
                 <Link href="/contact" className={BTN_PRIMARY}>
                   Discuss an engagement
                 </Link>
-                <Link href="#how-it-works" className={BTN_SECONDARY}>
+                <Link href="/how-it-works" className={BTN_SECONDARY}>
                   See how it works
                 </Link>
               </div>
@@ -486,16 +504,16 @@ export default function HomePage() {
       </main>
 
       {/* ====================================================================
-          8. FOOTER — minimal, with contact + legal disclaimer
+          8. FOOTER, minimal, with contact + legal disclaimer
       ==================================================================== */}
       <footer className="border-t border-[#E5E7EB] bg-[#FAFAFA]">
-        <div className="mx-auto max-w-6xl px-6 py-12 text-sm text-slate-500">
+        <div className="mx-auto max-w-6xl px-6 py-12 text-sm text-slate-600">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <Logo wordClassName="text-sm text-[#0B0B1A]" markClassName="h-5 w-5" />
             <p>© {new Date().getFullYear()} Kaptrix</p>
             <div className="flex items-center gap-6">
               <Link
-                href="#how-it-works"
+                href="/how-it-works"
                 className="transition hover:text-[#0B0B1A]"
               >
                 How it works
@@ -514,7 +532,7 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
-          <p className="mt-8 max-w-3xl text-xs leading-5 text-slate-400">
+          <p className="mt-8 max-w-3xl text-xs leading-5 text-slate-500">
             Kaptrix is an advisory and technology practice. Engagements are
             governed by individual letters of engagement. Not investment
             advice.

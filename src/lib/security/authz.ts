@@ -22,6 +22,26 @@ export interface AuthContext {
   hidden_menu_keys: string[];
 }
 
+/**
+ * Email allowlist for platform admins. Treated as admin regardless of
+ * whatever value is in `public.users.role`. Acts as a bootstrap so the
+ * designated admin never gets locked out if the role column hasn't been
+ * backfilled yet. Override with env `ADMIN_EMAILS` (comma-separated).
+ */
+const DEFAULT_ADMIN_EMAILS = ["dferdows@gmail.com"];
+export function getAdminEmails(): string[] {
+  const raw = process.env.ADMIN_EMAILS;
+  if (!raw) return DEFAULT_ADMIN_EMAILS;
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+export function isAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return getAdminEmails().includes(email.toLowerCase());
+}
+
 export class AuthError extends Error {
   constructor(
     public status: number,
@@ -52,12 +72,22 @@ export async function requireAuth(): Promise<AuthContext> {
     .eq("id", user.id)
     .maybeSingle();
 
+  const resolvedEmail = profile?.email ?? user.email ?? null;
+  const dbRole = (profile?.role as AppRole | undefined) ?? null;
+  // Email allowlist overrides whatever is (or isn't) in the DB.
+  const effectiveRole: AppRole | null = isAdminEmail(resolvedEmail)
+    ? "admin"
+    : dbRole;
+  const effectiveApproved = isAdminEmail(resolvedEmail)
+    ? true
+    : (profile?.approved ?? false);
+
   return {
     supabase,
     userId: user.id,
-    email: profile?.email ?? user.email ?? null,
-    role: (profile?.role as AppRole | undefined) ?? null,
-    approved: profile?.approved ?? false,
+    email: resolvedEmail,
+    role: effectiveRole,
+    approved: effectiveApproved,
     hidden_menu_keys: (profile?.hidden_menu_keys as string[] | undefined) ?? [],
   };
 }

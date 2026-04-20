@@ -29,10 +29,10 @@ export function PublicHeader() {
       scrolled
         ? active
           ? "text-slate-900"
-          : "text-slate-600 hover:text-slate-900"
+          : "text-slate-700 hover:text-slate-900"
         : active
           ? "text-white"
-          : "text-white/70 hover:text-white"
+          : "text-slate-100 hover:text-white"
     }`;
   };
 
@@ -71,8 +71,8 @@ export function PublicHeader() {
           href="/login"
           className={`text-sm font-medium transition sm:text-base ${
             scrolled
-              ? "text-slate-600 hover:text-slate-900"
-              : "text-white/70 hover:text-white"
+              ? "text-slate-700 hover:text-slate-900"
+              : "text-slate-100 hover:text-white"
           }`}
         >
           Client login

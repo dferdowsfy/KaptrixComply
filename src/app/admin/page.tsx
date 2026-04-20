@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AdminPanel } from "@/components/admin/admin-panel";
+import { isAdminEmail } from "@/lib/security/authz";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,8 @@ export default async function AdminPage() {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profile?.role !== "admin") {
+  const isAdmin = profile?.role === "admin" || isAdminEmail(user.email);
+  if (!isAdmin) {
     redirect("/preview");
   }
 

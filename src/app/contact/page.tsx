@@ -4,7 +4,7 @@ import { PublicHeader } from "@/components/home/public-header";
 import { Logo } from "@/components/home/logo";
 
 export const metadata: Metadata = {
-  title: "Contact — Kaptrix",
+  title: "Contact, Kaptrix",
   description: "Discuss an engagement with Kaptrix.",
 };
 
@@ -36,7 +36,7 @@ export default async function ContactPage({
         <p className="mt-6 max-w-xl text-base leading-7 text-slate-600">
           {intent === "sample"
             ? "Tell us your firm and the kind of deal you're looking at. We'll send a redacted sample of a Master Diligence Report and IC memo."
-            : "Tell us about the deal — sector, stage, timeline. We'll respond within one business day with next steps and a proposed scope."}
+            : "Tell us about the deal, sector, stage, timeline. We'll respond within one business day with next steps and a proposed scope."}
         </p>
 
         <div className="mt-10 rounded-md border border-[#E5E7EB] bg-[#FAFAFA] p-6 text-sm leading-6 text-slate-700">

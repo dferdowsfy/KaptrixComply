@@ -5,7 +5,7 @@ import { PublicHeader } from "@/components/home/public-header";
 export const metadata: Metadata = {
   title: "How Kaptrix Works",
   description:
-    "The evaluation layer for AI-driven businesses. Deterministic scoring, evidence-driven adjustments, and a live reasoning surface that holds up under IC scrutiny.",
+    "The evaluation layer for AI-driven businesses. Structured scoring, evidence-driven adjustments, and a live reasoning surface that holds up under IC scrutiny.",
 };
 
 export default function HowItWorksPage() {
@@ -60,7 +60,7 @@ function Hero() {
         <p className="mt-8 max-w-2xl text-base leading-8 text-slate-300 sm:text-lg">
           Kaptrix is an AI system assessment and decision engine. It evaluates
           whether an AI-driven product is credible, durable, and
-          investment-worthy based on evidence — not narrative.
+          investment-worthy based on evidence, not narrative.
         </p>
         <div className="mt-10 flex flex-wrap gap-3">
           <Link
@@ -114,8 +114,8 @@ function ProblemSection() {
         Diligence on AI-driven businesses has a structural
         problem: the thing being evaluated is often the thing least visible in
         a data room. Demos perform. Decks assert. Founders narrate. The
-        underlying system — models, dependencies, data posture, controls,
-        failure modes — sits behind a layer of interpretation that traditional
+        underlying system, models, dependencies, data posture, controls,
+        failure modes, sits behind a layer of interpretation that traditional
         diligence was not designed to penetrate.
       </Lede>
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -145,7 +145,7 @@ function ProblemSection() {
       <Pullquote>
         Kaptrix is built for the moment after that gap becomes visible. It
         gives investment teams a structured, evidence-backed view of whether
-        an AI system is real, durable, and worth the capital — and a live
+        an AI system is real, durable, and worth the capital, and a live
         reasoning surface to interrogate that view as new information arrives.
       </Pullquote>
     </Section>
@@ -159,7 +159,7 @@ function ProblemSection() {
 function WhatKaptrixIsSection() {
   const pillars = [
     {
-      title: "Deterministic scoring engine",
+      title: "Structured scoring engine",
       body: "The same inputs produce the same output, every time.",
       accent: "from-indigo-500 to-indigo-700",
     },
@@ -171,7 +171,7 @@ function WhatKaptrixIsSection() {
     {
       title: "Reasoning engine",
       body:
-        "Operates continuously on top of both — grounded in what has actually been observed about this specific system.",
+        "Operates continuously on top of both, grounded in what has actually been observed about this specific system.",
       accent: "from-fuchsia-500 to-fuchsia-700",
     },
   ];
@@ -181,7 +181,7 @@ function WhatKaptrixIsSection() {
       <Lede>
         Kaptrix combines three things that don&apos;t usually coexist in a
         single platform. The operator owns the score. The AI expands what the
-        operator can see. Evidence — not opinion — is what moves anything.
+        operator can see. Evidence, not opinion, is what moves anything.
       </Lede>
       <div className="mt-10 grid gap-5 md:grid-cols-3">
         {pillars.map((p) => (
@@ -228,11 +228,11 @@ function CoreIdeaSection() {
           Kaptrix does neither in isolation
         </p>
         <p className="mt-3 text-base leading-8 text-slate-800">
-          A deterministic scoring engine runs underneath a live reasoning
+          A rubric-driven scoring engine runs underneath a live reasoning
           layer, with a strict separation between what the operator decides
           and what the AI contributes. The scoring logic is fixed and
           inspectable. The AI layer is bounded and auditable. Together they
-          produce something that is both fast and defensible — a combination
+          produce something that is both fast and defensible, a combination
           traditional diligence and first-generation AI tools have not
           delivered.
         </p>
@@ -261,9 +261,9 @@ function ThreeLayersSection() {
         <LayerCard
           number="01"
           title="The Scoring Engine"
-          tagline="Deterministic. Auditable. Operator-controlled."
+          tagline="Auditable. Operator-controlled."
           accent="indigo"
-          body="This is the trust anchor. Every downstream output — insights, comparisons, recommendations, risk flags — rolls up to a score produced by a fixed, inspectable process."
+          body="This is the trust anchor. Every downstream output, insights, comparisons, recommendations, risk flags, rolls up to a score produced by a fixed, inspectable process."
         >
           <SubHeading>Six risk dimensions</SubHeading>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -287,7 +287,7 @@ function ThreeLayersSection() {
           </SubHeading>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <PropertyTile
-              title="Scores are deterministic"
+              title="Scores are reproducible"
               body="The same inputs produce the same output, every time. No model variance, no drift between runs, no &lsquo;the AI felt differently today.&rsquo;"
             />
             <PropertyTile
@@ -296,7 +296,7 @@ function ThreeLayersSection() {
             />
             <PropertyTile
               title="The operator assigns every base score"
-              body="The AI does not. This is a hard architectural constraint — not a configuration setting, not user-toggleable."
+              body="The AI does not. This is a hard architectural constraint, not a configuration setting, not user-toggleable."
             />
             <PropertyTile
               title="Every score carries rationale"
@@ -313,7 +313,7 @@ function ThreeLayersSection() {
           body="Traditional diligence front-loads interviews because there is no better way to surface hidden structure when starting from zero. Kaptrix inverts this."
         >
           <p className="mt-2 text-sm leading-7 text-slate-700">
-            Artifacts come first — architecture diagrams, model documentation,
+            Artifacts come first, architecture diagrams, model documentation,
             policies, contracts, vendor dependencies, logs, metrics, output
             samples. The platform ingests them and extracts structured
             signals: claims made, controls in place, dependencies declared,
@@ -364,7 +364,7 @@ function ThreeLayersSection() {
                 Outputs are grounded.
               </span>{" "}
               No generic answers. No hallucinated confidence. If the evidence
-              does not support a conclusion, the engine says so — and flags it
+              does not support a conclusion, the engine says so, and flags it
               as a gap to close rather than a question to paper over.
             </p>
           </div>
@@ -449,8 +449,8 @@ function EvidenceFlowSection() {
           <li className="flex gap-3">
             <CheckGlyph />
             <span>
-              The result is a scoring model that stays <em>live</em> —
-              continuously updated as new artifacts arrive — while remaining{" "}
+              The result is a scoring model that stays <em>live</em> , 
+              continuously updated as new artifacts arrive, while remaining{" "}
               <em>controlled</em>.
             </span>
           </li>
@@ -484,7 +484,7 @@ function ConfidenceSection() {
         <ScenarioCard
           tone="warn"
           headline="High score, low confidence"
-          body="The evidence we have is positive — but we have not seen enough."
+          body="The evidence we have is positive, but we have not seen enough."
         />
         <ScenarioCard
           tone="go"
@@ -535,7 +535,7 @@ function ScrutinySection() {
         ))}
       </ul>
       <Pullquote>
-        The audit trail is not a feature bolted on afterward — it is the
+        The audit trail is not a feature bolted on afterward, it is the
         structure the platform is built on. If a conclusion cannot be traced
         to its source, it is not a conclusion Kaptrix will present.
       </Pullquote>
@@ -561,7 +561,7 @@ function DifferentiatorsSection() {
             "Defensible but slow",
             "Inconsistent across deals",
             "Dependent on whichever partner is most technical",
-            "Scales poorly — every evaluation starts from zero",
+            "Scales poorly, every evaluation starts from zero",
           ]}
         />
         <ApproachCard
@@ -582,7 +582,7 @@ function DifferentiatorsSection() {
           {[
             "Structured human judgment",
             "Automated evidence extraction",
-            "Deterministic scoring logic",
+            "Rubric-driven scoring logic",
             "Full auditability",
             "Continuous reasoning that stays live throughout diligence",
           ].map((r) => (
@@ -609,7 +609,7 @@ function BoundariesSection() {
   const items = [
     {
       title: "Does not predict financial performance",
-      body: "Evaluates the AI system itself — not the business built around it.",
+      body: "Evaluates the AI system itself, not the business built around it.",
     },
     {
       title: "Does not replace full technical or legal diligence",
@@ -623,7 +623,7 @@ function BoundariesSection() {
     {
       title: "Does not accept claims it cannot trace",
       body:
-        "If the evidence is not there, the gap is surfaced — not filled with inference.",
+        "If the evidence is not there, the gap is surfaced, not filled with inference.",
     },
   ];
   return (
@@ -740,7 +740,7 @@ function ShiftSection() {
 
       <p className="mt-8 max-w-3xl text-sm leading-7 text-slate-600">
         Kaptrix is built to answer the second question in real time, with full
-        context, and with logic you can defend — in front of an investment
+        context, and with logic you can defend, in front of an investment
         committee, a board, or an LP.
       </p>
     </Section>
