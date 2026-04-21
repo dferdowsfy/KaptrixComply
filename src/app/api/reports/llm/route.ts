@@ -9,6 +9,12 @@ import {
   buildUpdateSystemPrompt,
   type AdvancedReportId,
 } from "@/lib/reports/advanced-reports";
+import { requireAuth } from "@/lib/security/authz";
+import {
+  getUserPlanContext,
+  checkReportLimit,
+  recordUsage,
+} from "@/lib/plans-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -48,6 +54,42 @@ export async function POST(req: Request) {
       { error: `Unknown report_type: ${reportType}` },
       { status: 400 },
     );
+  }
+
+  // Tier enforcement: require auth + check monthly report limit.
+  let userId: string | null = null;
+  try {
+    const authCtx = await requireAuth();
+    userId = authCtx.userId;
+    const plan = await getUserPlanContext(authCtx.userId);
+    if (plan) {
+      if (!plan.limits.advanced_reports_enabled) {
+        return NextResponse.json(
+          {
+            error: `Advanced report exports are not included on the ${plan.tier} plan. Upgrade to Professional or Institutional to unlock.`,
+            code: "tier_feature_locked",
+            tier: plan.tier,
+          },
+          { status: 402 },
+        );
+      }
+      const check = checkReportLimit(plan);
+      if (!check.allowed) {
+        return NextResponse.json(
+          {
+            error: check.reason,
+            code: "tier_limit_reached",
+            limit: check.limit,
+            current: check.current,
+            tier: check.tier,
+          },
+          { status: 402 },
+        );
+      }
+    }
+  } catch {
+    // Unauthenticated callers cannot generate reports.
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const useOpenRouter = isOpenRouterConfigured();
@@ -161,6 +203,12 @@ Return the report as clean markdown only. No preamble, no closing remarks, no co
         },
         { status: 502 },
       );
+    }
+
+    if (userId) {
+      // Best-effort usage increment. Ignore failures so a successful
+      // generation isn't hidden from the user by a counter bug.
+      recordUsage(userId, "reports").catch(() => {});
     }
 
     return NextResponse.json({

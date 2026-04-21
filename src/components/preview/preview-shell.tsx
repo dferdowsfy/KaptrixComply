@@ -8,6 +8,7 @@ import { useNavVisibility } from "@/hooks/use-nav-visibility";
 import { formatDate } from "@/lib/utils";
 import { ConnectionStatus } from "@/components/preview/connection-status";
 import { ProfileMenu } from "@/components/preview/profile-menu";
+import { TierPill } from "@/components/preview/tier-pill";
 import { NavSettingsMenu } from "@/components/preview/nav-settings-menu";
 import { useReportStore } from "@/lib/reports/report-store";
 import { useChatPanel } from "@/components/preview/chat-panel-context";
@@ -79,6 +80,7 @@ export function PreviewShell({
                 <HeaderChip label="Tier" value={client.tier} tone="neutral" />
               )}
               <ConnectionStatus />
+              <TierPill />
               <ProfileMenu />
             </div>
           </div>

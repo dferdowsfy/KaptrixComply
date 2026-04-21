@@ -73,6 +73,7 @@ export function ProfileMenu() {
     await supabase.auth.signOut();
     setUser(null);
     setOpen(false);
+    router.push("/login");
     router.refresh();
   }, [supabaseConfigured, router]);
 

@@ -3,13 +3,28 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PREVIEW_TABS } from "@/lib/preview-tabs";
+import { ALL_TIERS, TIERS, type Tier, resolveLimits } from "@/lib/plans";
+
+interface TierOverrides {
+  max_engagements?: number;
+  max_reports_per_month?: number;
+  max_ai_queries_per_month?: number;
+  benchmarking_enabled?: boolean;
+  advanced_reports_enabled?: boolean;
+  priority_processing?: boolean;
+  team_collaboration?: boolean;
+}
 
 interface AdminUserRow {
   id: string;
   email: string;
   role: string;
   approved: boolean;
+  tier: Tier;
+  tier_overrides: TierOverrides | null;
   hidden_menu_keys: string[];
+  full_name?: string | null;
+  firm_name?: string | null;
   created_at: string;
   last_login_at: string | null;
 }
@@ -49,7 +64,15 @@ export function AdminPanel() {
   }, [load]);
 
   const patchUser = useCallback(
-    async (id: string, patch: Partial<Pick<AdminUserRow, "role" | "approved" | "hidden_menu_keys">>) => {
+    async (
+      id: string,
+      patch: Partial<
+        Pick<
+          AdminUserRow,
+          "role" | "approved" | "tier" | "tier_overrides" | "hidden_menu_keys"
+        >
+      >,
+    ) => {
       setBusyUserId(id);
       try {
         const res = await fetch(`/api/admin/users/${id}`, {
@@ -166,6 +189,18 @@ export function AdminPanel() {
         </div>
       )}
 
+      <NewUserForm
+        onCreated={(created) => {
+          setUsers((rows) => [created, ...rows]);
+          setToast(`Invite sent to ${created.email}`);
+          setTimeout(() => setToast(null), 3500);
+        }}
+        onError={(msg) => {
+          setToast(msg);
+          setTimeout(() => setToast(null), 3500);
+        }}
+      />
+
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -173,6 +208,8 @@ export function AdminPanel() {
               <tr>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Tier</th>
+                <th className="px-4 py-3">Limits</th>
                 <th className="px-4 py-3">Approved</th>
                 <th className="px-4 py-3">Hidden menu tabs</th>
                 <th className="px-4 py-3">Created</th>
@@ -182,13 +219,13 @@ export function AdminPanel() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                     Loading users…
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                     No users yet.
                   </td>
                 </tr>
@@ -213,6 +250,31 @@ export function AdminPanel() {
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={u.tier ?? "starter"}
+                        disabled={busyUserId === u.id}
+                        onChange={(e) =>
+                          patchUser(u.id, { tier: e.target.value as Tier })
+                        }
+                        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+                      >
+                        {ALL_TIERS.map((t) => (
+                          <option key={t} value={t}>
+                            {TIERS[t].label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      <LimitsEditor
+                        user={u}
+                        busy={busyUserId === u.id}
+                        onSave={(overrides) =>
+                          patchUser(u.id, { tier_overrides: overrides })
+                        }
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <label className="inline-flex items-center gap-2">
@@ -291,6 +353,289 @@ export function AdminPanel() {
         Hidden-tab changes apply the next time the user loads any preview page.
         &quot;Home&quot; and &quot;Overview&quot; are always visible by design.
       </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NewUserForm — admin invites a new user by email with role + tier.
+// ---------------------------------------------------------------------------
+function NewUserForm({
+  onCreated,
+  onError,
+}: {
+  onCreated: (user: AdminUserRow) => void;
+  onError: (msg: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [firmName, setFirmName] = useState("");
+  const [role, setRole] = useState("operator");
+  const [tier, setTier] = useState<Tier>("starter");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          role,
+          tier,
+          full_name: fullName.trim() || undefined,
+          firm_name: firmName.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      onCreated({
+        id: data.user.id,
+        email: data.user.email,
+        role: data.user.role,
+        approved: true,
+        tier: data.user.tier,
+        tier_overrides: null,
+        hidden_menu_keys: [],
+        full_name: fullName || null,
+        firm_name: firmName || null,
+        created_at: new Date().toISOString(),
+        last_login_at: null,
+      });
+      setEmail("");
+      setFullName("");
+      setFirmName("");
+      setOpen(false);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Create failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+        >
+          + Invite new user
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-900">Invite a new user</h3>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-xs text-slate-500 hover:text-slate-700"
+        >
+          Cancel
+        </button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <label className="text-xs font-medium text-slate-700 lg:col-span-2">
+          Email
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            placeholder="name@firm.com"
+          />
+        </label>
+        <label className="text-xs font-medium text-slate-700">
+          Full name
+          <input
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+        </label>
+        <label className="text-xs font-medium text-slate-700">
+          Firm
+          <input
+            type="text"
+            value={firmName}
+            onChange={(e) => setFirmName(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+        </label>
+        <label className="text-xs font-medium text-slate-700">
+          Role
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          >
+            {ROLE_OPTIONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-medium text-slate-700 sm:col-span-2 lg:col-span-1">
+          Tier
+          <select
+            value={tier}
+            onChange={(e) => setTier(e.target.value as Tier)}
+            className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          >
+            {ALL_TIERS.map((t) => (
+              <option key={t} value={t}>
+                {TIERS[t].label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="mt-3 flex justify-end gap-2">
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
+        >
+          {busy ? "Sending invite…" : "Send invite"}
+        </button>
+      </div>
+      <p className="mt-2 text-[11px] text-slate-500">
+        The user receives an email invite with a link to set their password.
+      </p>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LimitsEditor — inline per-user tier override editor.
+// ---------------------------------------------------------------------------
+function LimitsEditor({
+  user,
+  busy,
+  onSave,
+}: {
+  user: AdminUserRow;
+  busy: boolean;
+  onSave: (overrides: TierOverrides | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const effective = resolveLimits(user.tier, user.tier_overrides);
+  const [eng, setEng] = useState<string>(
+    String(user.tier_overrides?.max_engagements ?? ""),
+  );
+  const [reps, setReps] = useState<string>(
+    String(user.tier_overrides?.max_reports_per_month ?? ""),
+  );
+  const [ai, setAi] = useState<string>(
+    String(user.tier_overrides?.max_ai_queries_per_month ?? ""),
+  );
+
+  function summary(limit: number): string {
+    return limit < 0 ? "Unlimited" : String(limit);
+  }
+
+  function save() {
+    const next: TierOverrides = {};
+    if (eng.trim() !== "") next.max_engagements = Number(eng);
+    if (reps.trim() !== "") next.max_reports_per_month = Number(reps);
+    if (ai.trim() !== "") next.max_ai_queries_per_month = Number(ai);
+    onSave(Object.keys(next).length ? next : null);
+    setOpen(false);
+  }
+
+  function reset() {
+    setEng("");
+    setReps("");
+    setAi("");
+    onSave(null);
+    setOpen(false);
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="space-y-0.5 text-[11px] text-slate-600">
+        <div>Engagements: {summary(effective.max_engagements)}</div>
+        <div>Reports/mo: {summary(effective.max_reports_per_month)}</div>
+        <div>AI queries/mo: {summary(effective.max_ai_queries_per_month)}</div>
+      </div>
+      {!open ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setOpen(true)}
+          className="mt-1 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+        >
+          {user.tier_overrides ? "Edit override" : "Override"}
+        </button>
+      ) : (
+        <div className="mt-1 space-y-1 rounded-md border border-indigo-200 bg-indigo-50/60 p-2">
+          <label className="block text-[10px] font-medium text-slate-700">
+            Engagements (−1 = unlimited)
+            <input
+              value={eng}
+              onChange={(e) => setEng(e.target.value)}
+              inputMode="numeric"
+              className="mt-0.5 block w-full rounded border border-slate-300 px-1.5 py-0.5 text-xs"
+            />
+          </label>
+          <label className="block text-[10px] font-medium text-slate-700">
+            Reports / month
+            <input
+              value={reps}
+              onChange={(e) => setReps(e.target.value)}
+              inputMode="numeric"
+              className="mt-0.5 block w-full rounded border border-slate-300 px-1.5 py-0.5 text-xs"
+            />
+          </label>
+          <label className="block text-[10px] font-medium text-slate-700">
+            AI queries / month
+            <input
+              value={ai}
+              onChange={(e) => setAi(e.target.value)}
+              inputMode="numeric"
+              className="mt-0.5 block w-full rounded border border-slate-300 px-1.5 py-0.5 text-xs"
+            />
+          </label>
+          <div className="flex gap-1 pt-1">
+            <button
+              type="button"
+              onClick={save}
+              className="rounded bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-indigo-500"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={reset}
+              className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded px-2 py-0.5 text-[11px] text-slate-500 hover:text-slate-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

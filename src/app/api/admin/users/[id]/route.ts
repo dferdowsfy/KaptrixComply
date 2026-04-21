@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, requireAdmin, authErrorResponse } from "@/lib/security/authz";
 import { getServiceClient } from "@/lib/supabase/service";
+import { isValidTier } from "@/lib/plans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,9 +9,36 @@ export const dynamic = "force-dynamic";
 const ALLOWED_ROLES = ["admin", "operator", "analyst", "reviewer", "client_viewer"] as const;
 type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
+const OVERRIDE_NUMERIC_KEYS = [
+  "max_engagements",
+  "max_reports_per_month",
+  "max_ai_queries_per_month",
+] as const;
+const OVERRIDE_BOOLEAN_KEYS = [
+  "benchmarking_enabled",
+  "advanced_reports_enabled",
+  "priority_processing",
+  "team_collaboration",
+] as const;
+
+function sanitizeOverrides(input: unknown): Record<string, number | boolean> | null {
+  if (!input || typeof input !== "object") return null;
+  const src = input as Record<string, unknown>;
+  const out: Record<string, number | boolean> = {};
+  for (const key of OVERRIDE_NUMERIC_KEYS) {
+    const v = src[key];
+    if (typeof v === "number" && Number.isFinite(v)) out[key] = Math.trunc(v);
+  }
+  for (const key of OVERRIDE_BOOLEAN_KEYS) {
+    const v = src[key];
+    if (typeof v === "boolean") out[key] = v;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 /**
  * PATCH /api/admin/users/:id
- * Admin-only. Updates role, approval, and hidden_menu_keys for a user.
+ * Admin-only. Updates role, approval, tier, tier overrides, and hidden_menu_keys for a user.
  */
 export async function PATCH(
   request: NextRequest,
@@ -40,6 +68,20 @@ export async function PATCH(
   if (typeof body.approved === "boolean") {
     patch.approved = body.approved;
   }
+  if (typeof body.tier === "string") {
+    if (!isValidTier(body.tier)) {
+      return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
+    }
+    patch.tier = body.tier;
+  }
+  if ("tier_overrides" in body) {
+    if (body.tier_overrides === null) {
+      patch.tier_overrides = null;
+    } else {
+      const sanitized = sanitizeOverrides(body.tier_overrides);
+      patch.tier_overrides = sanitized; // may be null if nothing valid
+    }
+  }
   if (Array.isArray(body.hidden_menu_keys)) {
     patch.hidden_menu_keys = body.hidden_menu_keys
       .filter((k: unknown): k is string => typeof k === "string")
@@ -66,7 +108,7 @@ export async function PATCH(
     .from("users")
     .update(patch)
     .eq("id", id)
-    .select("id, email, role, approved, hidden_menu_keys")
+    .select("id, email, role, approved, tier, tier_overrides, hidden_menu_keys")
     .maybeSingle();
 
   if (error) {

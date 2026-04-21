@@ -11,6 +11,12 @@ import {
 } from "@/lib/llm/openrouter";
 import { getServiceClient } from "@/lib/supabase/service";
 import { getPreviewSnapshot } from "@/lib/preview/data";
+import { createClient as createServerSupabase } from "@/lib/supabase/server";
+import {
+  getUserPlanContext,
+  checkAiQueryLimit,
+  recordUsage,
+} from "@/lib/plans-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -140,6 +146,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
   }
 
+  // Tier enforcement (signed-in users only — anonymous demo chat is ungated).
+  let authedUserId: string | null = null;
+  try {
+    const supabase = await createServerSupabase();
+    const { data } = await supabase.auth.getUser();
+    if (data?.user) {
+      authedUserId = data.user.id;
+      const plan = await getUserPlanContext(data.user.id);
+      if (plan) {
+        const check = checkAiQueryLimit(plan);
+        if (!check.allowed) {
+          return NextResponse.json(
+            {
+              error: check.reason,
+              code: "tier_limit_reached",
+              limit: check.limit,
+              current: check.current,
+              tier: check.tier,
+            },
+            { status: 402 },
+          );
+        }
+      }
+    }
+  } catch {
+    // Ignore — fall through to anonymous path.
+  }
+
   const sessionId = (body.session_id ?? "").trim() || `anon-${Date.now()}`;
   const clientId = (body.client_id ?? "").trim() || null;
 
@@ -253,6 +287,10 @@ Answer:`;
         provider: useOpenRouter ? "openrouter" : "self_hosted",
       },
     });
+
+    if (authedUserId) {
+      recordUsage(authedUserId, "ai_queries").catch(() => {});
+    }
 
     return NextResponse.json({ answer, suggestions });
   } catch (err) {

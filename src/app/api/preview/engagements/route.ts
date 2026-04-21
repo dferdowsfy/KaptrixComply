@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase/service";
 import { requireAuth, authErrorResponse } from "@/lib/security/authz";
+import { getUserPlanContext, checkEngagementLimit } from "@/lib/plans-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +46,24 @@ export async function POST(request: NextRequest) {
     ctx = await requireAuth();
   } catch (err) {
     return authErrorResponse(err);
+  }
+
+  // Tier enforcement: block if the user is at their active-engagement cap.
+  const plan = await getUserPlanContext(ctx.userId);
+  if (plan) {
+    const check = checkEngagementLimit(plan);
+    if (!check.allowed) {
+      return NextResponse.json(
+        {
+          error: check.reason,
+          code: "tier_limit_reached",
+          limit: check.limit,
+          current: check.current,
+          tier: check.tier,
+        },
+        { status: 402 },
+      );
+    }
   }
 
   const body = await request.json();
