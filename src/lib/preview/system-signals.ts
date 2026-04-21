@@ -46,6 +46,8 @@ export interface GapSignal {
 export interface ModelAdjustmentSignal {
   dimension: ScoreDimension;
   direction: "up" | "down";
+  /** Weight delta on the 0–5 composite scale, always positive (direction conveys sign). */
+  delta: number;
   reason: string;          // e.g. "Corporate IC context", "Vendor concentration prioritized"
 }
 
@@ -73,14 +75,14 @@ function engagementTypeAdjustments(prev: string | undefined, next: string | unde
   if (!next || next === prev) return [];
   const out: ModelAdjustmentSignal[] = [];
   if (next.startsWith("Corporate IC")) {
-    out.push({ dimension: "product_credibility", direction: "up", reason: "Corporate IC context" });
-    out.push({ dimension: "governance_safety", direction: "down", reason: "Corporate IC context — governance carried by buyer" });
+    out.push({ dimension: "product_credibility", direction: "up",   delta: 0.20, reason: "Corporate IC context" });
+    out.push({ dimension: "governance_safety",   direction: "down", delta: 0.15, reason: "Corporate IC context — governance carried by buyer" });
   } else if (next.startsWith("PE") || next.startsWith("Growth") || next.startsWith("Portfolio")) {
-    out.push({ dimension: "open_validation", direction: "up", reason: "PE diligence posture" });
-    out.push({ dimension: "production_readiness", direction: "up", reason: "PE diligence posture" });
+    out.push({ dimension: "open_validation",      direction: "up", delta: 0.25, reason: "PE diligence posture" });
+    out.push({ dimension: "production_readiness", direction: "up", delta: 0.20, reason: "PE diligence posture" });
   } else if (next.startsWith("Vendor selection")) {
-    out.push({ dimension: "tooling_exposure", direction: "up", reason: "Vendor-selection context" });
-    out.push({ dimension: "production_readiness", direction: "up", reason: "Vendor-selection context" });
+    out.push({ dimension: "tooling_exposure",     direction: "up", delta: 0.30, reason: "Vendor-selection context" });
+    out.push({ dimension: "production_readiness", direction: "up", delta: 0.20, reason: "Vendor-selection context" });
   }
   return out;
 }
@@ -88,10 +90,10 @@ function engagementTypeAdjustments(prev: string | undefined, next: string | unde
 function buyerArchetypeAdjustments(prev: string | undefined, next: string | undefined): ModelAdjustmentSignal[] {
   if (!next || next === prev) return [];
   if (/SMB/i.test(next)) {
-    return [{ dimension: "production_readiness", direction: "down", reason: "SMB operator — lighter production bar" }];
+    return [{ dimension: "production_readiness", direction: "down", delta: 0.15, reason: "SMB operator — lighter production bar" }];
   }
   if (/Large-cap PE|Growth equity/i.test(next)) {
-    return [{ dimension: "open_validation", direction: "up", reason: `${next} audience` }];
+    return [{ dimension: "open_validation", direction: "up", delta: 0.20, reason: `${next} audience` }];
   }
   return [];
 }
@@ -117,7 +119,7 @@ function diligencePriorityAdjustments(prev: string[] | undefined, next: string[]
   for (const item of added) {
     const dim = PRIORITY_TO_DIMENSION[item];
     if (!dim) continue;
-    out.push({ dimension: dim, direction: "up", reason: `Client prioritized "${item}"` });
+    out.push({ dimension: dim, direction: "up", delta: 0.15, reason: `Client prioritized "${item}"` });
   }
   return out;
 }
