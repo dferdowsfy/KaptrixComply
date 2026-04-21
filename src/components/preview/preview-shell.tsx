@@ -147,17 +147,19 @@ export function PreviewShell({
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <main className={`mx-auto flex-1 px-4 py-6 pb-28 transition-all duration-300 sm:px-6 sm:py-8 sm:pb-24 ${chatCtx.open && chatPanel ? "max-w-5xl" : "max-w-7xl"}`}>
-          {children}
+        <main className={`min-w-0 flex-1 px-4 py-6 pb-28 transition-all duration-300 sm:px-6 sm:py-8 sm:pb-24`}>
+          <div className={`mx-auto transition-all duration-300 ${chatCtx.open && chatPanel ? "max-w-5xl" : "max-w-7xl"}`}>
+            {children}
+          </div>
         </main>
 
         {/* Chat side panel */}
         {chatPanel && (
           <aside
-            className={`print-hide fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-slate-200 bg-slate-900 shadow-xl transition-transform duration-300 sm:w-[420px] lg:relative lg:w-[420px] lg:shadow-none ${
+            className={`print-hide fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-slate-200 bg-slate-900 shadow-xl transition-transform duration-300 md:relative md:inset-auto md:z-auto md:w-[420px] md:shrink-0 md:shadow-none ${
               chatCtx.open
-                ? "translate-x-0"
-                : "pointer-events-none translate-x-full lg:hidden"
+                ? "translate-x-0 md:translate-x-0"
+                : "pointer-events-none translate-x-full md:pointer-events-none md:hidden"
             }`}
           >
             {chatPanel}
