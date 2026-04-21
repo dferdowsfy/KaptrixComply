@@ -22,6 +22,10 @@ interface Props {
   documents: Document[];
   defaultIndustry?: Industry;
   onStateChange?: (state: IndustryCoverageState) => void;
+  /** Called when an operator clicks the inline "Upload evidence" CTA on a row. */
+  onArtifactClick?: (category: string, displayName: string) => void;
+  /** Highlight the row currently anchored by the upload zone. */
+  activeCategory?: string | null;
 }
 
 type Status = "provided" | "partial" | "missing";
@@ -37,6 +41,8 @@ export function IndustryCoverageMatrix({
   documents,
   defaultIndustry = "legal_tech",
   onStateChange,
+  onArtifactClick,
+  activeCategory,
 }: Props) {
   const [industry, setIndustry] = useState<Industry>(defaultIndustry);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -169,16 +175,22 @@ export function IndustryCoverageMatrix({
               <th className="px-4 py-3">Priority</th>
               <th className="px-4 py-3">Regulatory</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Action</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-sm">
             {rows.map((row) => {
               const isOpen = expanded === row.artifact.category;
+              const isActive = activeCategory === row.artifact.category;
               return (
                 <Fragment key={row.artifact.category}>
                   <tr
-                    className="cursor-pointer hover:bg-gray-50"
+                    className={`cursor-pointer transition ${
+                      isActive
+                        ? "bg-indigo-50/70 ring-1 ring-inset ring-indigo-300"
+                        : "hover:bg-gray-50"
+                    }`}
                     onClick={() =>
                       setExpanded(isOpen ? null : row.artifact.category)
                     }
@@ -208,13 +220,41 @@ export function IndustryCoverageMatrix({
                     <td className="px-4 py-3">
                       <StatusPill status={row.status} />
                     </td>
+                    <td className="px-4 py-3">
+                      {onArtifactClick && row.status !== "provided" ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onArtifactClick(
+                              row.artifact.category,
+                              row.artifact.display_name,
+                            );
+                          }}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 transition ${
+                            isActive
+                              ? "bg-indigo-600 text-white ring-indigo-600"
+                              : "bg-white text-indigo-700 ring-indigo-200 hover:bg-indigo-50"
+                          }`}
+                          title="Anchor the upload zone to this requirement"
+                        >
+                          {isActive ? "✓ Anchored" : "Upload evidence ↓"}
+                        </button>
+                      ) : row.docs.length > 0 ? (
+                        <span className="text-[11px] text-gray-500">
+                          {row.docs.length} file{row.docs.length > 1 ? "s" : ""}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-gray-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right text-gray-400">
                       {isOpen ? "▾" : "▸"}
                     </td>
                   </tr>
                   {isOpen && (
                     <tr className="bg-gray-50/60">
-                      <td colSpan={5} className="px-4 py-4">
+                      <td colSpan={6} className="px-4 py-4">
                         <div className="grid gap-4 md:grid-cols-2">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">

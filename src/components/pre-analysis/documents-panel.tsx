@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Document as DocRecord } from "@/lib/types";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import {
@@ -30,7 +30,19 @@ const ACCEPTED_MIME_LABELS = "PDF · DOCX · XLSX · PPTX · PNG · JPEG · CSV 
 const ACCEPT_ATTR =
   ".pdf,.docx,.xlsx,.pptx,.txt,.csv,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/csv,text/plain,image/png,image/jpeg";
 
-export function DocumentsPanel({ baseDocs }: { baseDocs: DocRecord[] }) {
+export function DocumentsPanel({
+  baseDocs,
+  targetCategory,
+  targetLabel,
+  onClearTarget,
+}: {
+  baseDocs: DocRecord[];
+  /** When set, the upload zone auto-selects this category and shows an
+   *  "Upload to satisfy this requirement" banner. */
+  targetCategory?: string | null;
+  targetLabel?: string | null;
+  onClearTarget?: () => void;
+}) {
   const { selectedId } = useSelectedPreviewClient();
   const added = useSyncExternalStore(
     subscribeUploadedDocs,
@@ -40,6 +52,19 @@ export function DocumentsPanel({ baseDocs }: { baseDocs: DocRecord[] }) {
   const [category, setCategory] = useState<string>("other");
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLLabelElement>(null);
+
+  // When the parent anchors a requirement, mirror it into the category
+  // selector and scroll the drop zone into view so the operator can
+  // immediately drag a file in without hunting for the picker.
+  useEffect(() => {
+    if (!targetCategory) return;
+    setCategory(targetCategory);
+    dropZoneRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [targetCategory]);
 
   const addFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -106,11 +131,11 @@ export function DocumentsPanel({ baseDocs }: { baseDocs: DocRecord[] }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-slate-900">
-            Diligence documents
+            Evidence Intake
           </h3>
           <p className="text-sm text-slate-600">
-            These files feed Kaptrix&rsquo;s reasoning. Add more evidence to sharpen
-            claims, red flags, and the executive report.
+            Drop files here to satisfy the requirements above. Each upload is
+            parsed and updates coverage in real time.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -120,7 +145,12 @@ export function DocumentsPanel({ baseDocs }: { baseDocs: DocRecord[] }) {
           <select
             id="doc-category"
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              if (onClearTarget && targetCategory && e.target.value !== targetCategory) {
+                onClearTarget();
+              }
+            }}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm focus:border-slate-900 focus:outline-none"
           >
             {CATEGORIES.map((c) => (
@@ -129,10 +159,20 @@ export function DocumentsPanel({ baseDocs }: { baseDocs: DocRecord[] }) {
               </option>
             ))}
           </select>
+          {targetCategory && onClearTarget && (
+            <button
+              type="button"
+              onClick={onClearTarget}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-800"
+            >
+              Clear anchor
+            </button>
+          )}
         </div>
       </div>
 
       <label
+        ref={dropZoneRef}
         htmlFor="doc-file-input"
         onDragOver={(e) => {
           e.preventDefault();
@@ -147,10 +187,17 @@ export function DocumentsPanel({ baseDocs }: { baseDocs: DocRecord[] }) {
         className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition ${
           dragActive
             ? "border-indigo-500 bg-indigo-50"
-            : "border-slate-300 hover:border-slate-400"
+            : targetCategory
+              ? "border-indigo-400 bg-indigo-50/40"
+              : "border-slate-300 hover:border-slate-400"
         }`}
       >
-        <p className="text-sm font-semibold text-slate-800">
+        {targetCategory && targetLabel ? (
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+            Upload to satisfy this requirement: {targetLabel}
+          </p>
+        ) : null}
+        <p className="mt-1 text-sm font-semibold text-slate-800">
           Drop files here, or click to browse
         </p>
         <p className="mt-1 text-xs text-slate-500">
