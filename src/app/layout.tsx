@@ -12,9 +12,38 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://kaptrix.com";
+
 export const metadata: Metadata = {
-  title: "Kaptrix Delivery Platform",
-  description: "AI Product Diligence for Private Equity",
+  title: {
+    default: "Kaptrix | AI Product Diligence for Private Equity",
+    template: "%s | Kaptrix",
+  },
+  description:
+    "Evidence-backed AI diligence for investors and operators. Expose fragile systems, score what's real, and produce decision-grade outputs before capital moves.",
+  metadataBase: new URL(baseUrl),
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    siteName: "Kaptrix",
+    title: "Kaptrix | AI Product Diligence for Private Equity",
+    description:
+      "Evidence-backed AI diligence for investors and operators. Expose fragile systems, score what's real, and produce decision-grade outputs before capital moves.",
+    url: baseUrl,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Kaptrix | AI Product Diligence for Private Equity",
+    description:
+      "Evidence-backed AI diligence for investors and operators. Expose fragile systems, score what's real, and produce decision-grade outputs before capital moves.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  verification: {
+    google: "wrahXh8ko1GDtQdrcbZEJRkAV7KXwsxMKEkmj5OminI",
+  },
 };
 
 export const viewport: Viewport = {
