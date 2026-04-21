@@ -1,14 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import {
   IndustryCoverageMatrix,
   type IndustryCoverageState,
 } from "@/components/documents/industry-coverage-matrix";
 import { DocumentsPanel } from "@/components/pre-analysis/documents-panel";
 import { SectionHeader } from "@/components/preview/preview-shell";
-import { SubmitToKnowledgeBase } from "@/components/preview/submit-to-knowledge-base";
-import type { CoveragePayload } from "@/lib/preview/knowledge-base";
 import { demoDocuments } from "@/lib/demo-data";
 import {
   readUploadedDocs,
@@ -78,57 +76,33 @@ export default function PreviewCoveragePage() {
     [baseDocuments, uploaded, engagementId],
   );
 
-  const [coverageState, setCoverageState] =
-    useState<IndustryCoverageState | null>(null);
+  const [, setCoverageState] = useState<IndustryCoverageState | null>(null);
   const [target, setTarget] = useState<{
     category: string;
     label: string;
   } | null>(null);
-
-  const handleArtifactClick = useCallback(
-    (category: string, displayName: string) => {
-      setTarget({ category, label: displayName });
-    },
-    [],
-  );
-
-  const buildPayload = useCallback(() => {
-    const s = coverageState;
-    const payload: CoveragePayload = {
-      kind: "coverage",
-      industry: s?.industry ?? null,
-      documents_total: documents.length,
-      gaps_count: s?.gap_categories.length ?? 0,
-      gap_summaries: s?.gap_categories.slice(0, 6) ?? [],
-    };
-    const summary = s
-      ? `${s.industry_label} · ${s.provided}/${s.total} artifacts · ${s.gap_categories.length} gap(s)`
-      : `${documents.length} documents submitted`;
-    return { payload, summary };
-  }, [coverageState, documents.length]);
 
   return (
     <div className="space-y-4">
       <SectionHeader
         eyebrow="Module 1"
         title="Evidence & Coverage"
-        description="Identify gaps and immediately upload evidence in one workspace. Each artifact row anchors the upload zone below; coverage updates the moment a file finishes parsing."
+        description="Missing artifacts surface as the primary action. Upload directly and watch status update inline — no page switches, no duplicate logs."
       />
-      <div className="rounded-2xl border bg-white p-4 shadow-sm sm:p-6">
-        <IndustryCoverageMatrix
-          documents={documents}
-          onStateChange={setCoverageState}
-          onArtifactClick={handleArtifactClick}
-          activeCategory={target?.category ?? null}
-        />
-      </div>
       <DocumentsPanel
-        baseDocs={baseDocuments}
         targetCategory={target?.category ?? null}
         targetLabel={target?.label ?? null}
         onClearTarget={() => setTarget(null)}
       />
-      <SubmitToKnowledgeBase step="coverage" buildPayload={buildPayload} />
+      <div className="rounded-2xl border bg-white p-4 shadow-sm sm:p-6">
+        <IndustryCoverageMatrix
+          documents={documents}
+          uploadedDocs={uploaded}
+          onStateChange={setCoverageState}
+          onArtifactClick={(category, label) => setTarget({ category, label })}
+          activeCategory={target?.category ?? null}
+        />
+      </div>
     </div>
   );
 }

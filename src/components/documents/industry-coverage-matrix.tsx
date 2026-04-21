@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { Document } from "@/lib/types";
+import type { UploadedDoc } from "@/lib/preview/uploaded-docs";
 import {
   INDUSTRY_OPTIONS,
   INDUSTRY_PROFILES,
@@ -26,6 +27,9 @@ interface Props {
   onArtifactClick?: (category: string, displayName: string) => void;
   /** Highlight the row currently anchored by the upload zone. */
   activeCategory?: string | null;
+  /** In-flight + parsed uploads for the current client. Used to render
+   *  per-row progress bars inside the artifact table. */
+  uploadedDocs?: readonly UploadedDoc[];
 }
 
 type Status = "provided" | "partial" | "missing";
@@ -43,6 +47,7 @@ export function IndustryCoverageMatrix({
   onStateChange,
   onArtifactClick,
   activeCategory,
+  uploadedDocs = [],
 }: Props) {
   const [industry, setIndustry] = useState<Industry>(defaultIndustry);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -91,8 +96,84 @@ export function IndustryCoverageMatrix({
     onStateChangeRef.current(stateSnapshot);
   }, [stateSnapshot]);
 
+  // Index uploaded docs by category for quick per-row lookup.
+  const uploadsByCategory = useMemo(() => {
+    const byCat: Record<string, UploadedDoc[]> = {};
+    for (const d of uploadedDocs) {
+      (byCat[d.category] ??= []).push(d);
+    }
+    return byCat;
+  }, [uploadedDocs]);
+
   return (
     <div className="space-y-5">
+      {/* Primary CTA — missing required artifacts, above everything else. */}
+      {missingRequired.length > 0 && (
+        <div className="rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+                Action required · {missingRequired.length} missing
+              </p>
+              <h3 className="mt-1 text-lg font-semibold text-amber-900">
+                Collect these {profile.label} artifacts to unlock scoring
+              </h3>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-amber-800">
+              <span>{coveragePct}% coverage</span>
+              <div className="h-1.5 w-24 overflow-hidden rounded-full bg-amber-200">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
+                  style={{ width: `${coveragePct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+            {missingRequired.map((r) => {
+              const isActive = activeCategory === r.artifact.category;
+              return (
+                <li
+                  key={r.artifact.category}
+                  className={`flex items-center justify-between gap-3 rounded-lg border bg-white/90 px-3 py-2 ${
+                    isActive
+                      ? "border-indigo-400 ring-1 ring-indigo-300"
+                      : "border-amber-200"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-amber-900">
+                      {r.artifact.display_name}
+                    </p>
+                    <p className="truncate text-[11px] text-amber-700">
+                      {r.artifact.why_it_matters}
+                    </p>
+                  </div>
+                  {onArtifactClick && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onArtifactClick(
+                          r.artifact.category,
+                          r.artifact.display_name,
+                        )
+                      }
+                      className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold ring-1 transition ${
+                        isActive
+                          ? "bg-indigo-600 text-white ring-indigo-600"
+                          : "bg-amber-900 text-white ring-amber-900 hover:bg-amber-800"
+                      }`}
+                    >
+                      {isActive ? "✓ Anchored" : "Upload"}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
@@ -219,6 +300,9 @@ export function IndustryCoverageMatrix({
                     </td>
                     <td className="px-4 py-3">
                       <StatusPill status={row.status} />
+                      <RowUploads
+                        uploads={uploadsByCategory[row.artifact.category] ?? []}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       {onArtifactClick && row.status !== "provided" ? (
@@ -296,36 +380,6 @@ export function IndustryCoverageMatrix({
           </tbody>
         </table>
       </div>
-
-      {missingRequired.length > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-amber-900">
-                AI-generated request list · {missingRequired.length} required
-                artifact{missingRequired.length > 1 ? "s" : ""} to collect
-              </p>
-              <p className="mt-1 text-xs text-amber-800">
-                These items are standard for {profile.label} diligence. Copy the
-                list below directly into your data-room request email.
-              </p>
-            </div>
-          </div>
-          <ol className="mt-3 space-y-2 text-sm text-amber-900">
-            {missingRequired.map((r, i) => (
-              <li key={r.artifact.category} className="flex gap-2">
-                <span className="font-semibold">{i + 1}.</span>
-                <span>
-                  <span className="font-semibold">
-                    {r.artifact.display_name}.
-                  </span>{" "}
-                  {r.artifact.why_it_matters}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
     </div>
   );
 }
@@ -342,5 +396,70 @@ function StatusPill({ status }: { status: Status }) {
     >
       {config.label}
     </span>
+  );
+}
+
+// Render recent uploads tied to an artifact row with live progress bars.
+function RowUploads({ uploads }: { uploads: UploadedDoc[] }) {
+  if (uploads.length === 0) return null;
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {uploads.map((d) => (
+        <li key={d.id} className="max-w-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className="truncate text-[11px] font-medium text-slate-700"
+              title={d.filename}
+            >
+              {d.filename}
+            </span>
+            {d.parse_status === "uploading" ? (
+              <span className="tabular-nums text-[10px] font-semibold text-sky-700">
+                {Math.max(0, Math.min(100, d.upload_percent ?? 0))}%
+              </span>
+            ) : d.parse_status === "parsing" ? (
+              <span className="text-[10px] font-semibold text-amber-700">
+                Parsing…
+              </span>
+            ) : d.parse_status === "parsed" ? (
+              <span className="text-[10px] font-semibold text-emerald-700">
+                ✓
+              </span>
+            ) : d.parse_status === "failed" ? (
+              <span
+                className="text-[10px] font-semibold text-rose-700"
+                title={d.error ?? "Failed"}
+              >
+                Failed
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold text-slate-500">
+                Queued
+              </span>
+            )}
+          </div>
+          {(d.parse_status === "uploading" ||
+            d.parse_status === "parsing" ||
+            d.parse_status === "queued") && (
+            <div
+              className={`mt-0.5 h-1 w-full overflow-hidden rounded-full ${
+                d.parse_status === "uploading" ? "bg-sky-100" : "bg-amber-100"
+              }`}
+            >
+              {d.parse_status === "uploading" ? (
+                <div
+                  className="h-full rounded-full bg-sky-500 transition-[width] duration-200 ease-out"
+                  style={{
+                    width: `${Math.max(2, Math.min(100, d.upload_percent ?? 0))}%`,
+                  }}
+                />
+              ) : (
+                <div className="h-full w-full animate-pulse rounded-full bg-amber-500" />
+              )}
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
