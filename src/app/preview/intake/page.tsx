@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { IntakeQuestionnaire } from "@/components/engagements/intake-questionnaire";
 import { SectionHeader } from "@/components/preview/preview-shell";
 import { SubmitToKnowledgeBase } from "@/components/preview/submit-to-knowledge-base";
@@ -13,53 +13,40 @@ import {
 import type { IntakePayload } from "@/lib/preview/knowledge-base";
 import type { Industry } from "@/lib/industry-requirements";
 
-const STORAGE_EVENT = "kaptrix:preview-intake-change";
-const EMPTY_PREVIEW_ANSWERS: PreviewAnswers = {};
+// Per-engagement local cache. Replaces the single global key that was
+// causing answers to vanish on logout and overwrite each other across
+// clients. The legacy global key is still read once as a migration
+// source so existing in-progress drafts aren't lost.
+const LEGACY_STORAGE_KEY = PREVIEW_INTAKE_STORAGE_KEY;
+function perEngagementKey(id: string): string {
+  return `kaptrix.preview.intake.answers.v2:${id}`;
+}
 
-let cachedPreviewAnswersRaw: string | null | undefined;
-let cachedPreviewAnswers: PreviewAnswers = EMPTY_PREVIEW_ANSWERS;
+const EMPTY: PreviewAnswers = {};
 
-function readPreviewAnswers(): PreviewAnswers {
-  if (typeof window === "undefined") return EMPTY_PREVIEW_ANSWERS;
-
+function readLocal(engagementId: string): PreviewAnswers {
+  if (typeof window === "undefined") return EMPTY;
   try {
-    const raw = window.localStorage.getItem(PREVIEW_INTAKE_STORAGE_KEY);
-    if (raw === cachedPreviewAnswersRaw) return cachedPreviewAnswers;
-
-    cachedPreviewAnswersRaw = raw;
-    cachedPreviewAnswers = raw
-      ? (JSON.parse(raw) as PreviewAnswers)
-      : EMPTY_PREVIEW_ANSWERS;
-
-    return cachedPreviewAnswers;
+    const raw = window.localStorage.getItem(perEngagementKey(engagementId));
+    if (raw) return JSON.parse(raw) as PreviewAnswers;
+    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) return JSON.parse(legacy) as PreviewAnswers;
+    return EMPTY;
   } catch {
-    cachedPreviewAnswersRaw = null;
-    cachedPreviewAnswers = EMPTY_PREVIEW_ANSWERS;
-    return cachedPreviewAnswers;
+    return EMPTY;
   }
 }
 
-function subscribeToPreviewAnswers(callback: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-
-  const handleStorage = (event: StorageEvent) => {
-    if (event.key !== null && event.key !== PREVIEW_INTAKE_STORAGE_KEY) return;
-    callback();
-  };
-  const handleLocalChange = () => callback();
-
-  window.addEventListener("storage", handleStorage);
-  window.addEventListener(STORAGE_EVENT, handleLocalChange);
-
-  return () => {
-    window.removeEventListener("storage", handleStorage);
-    window.removeEventListener(STORAGE_EVENT, handleLocalChange);
-  };
-}
-
-function notifyPreviewAnswersChanged(): void {
+function writeLocal(engagementId: string, answers: PreviewAnswers): void {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(STORAGE_EVENT));
+  try {
+    window.localStorage.setItem(
+      perEngagementKey(engagementId),
+      JSON.stringify(answers),
+    );
+  } catch {
+    // ignore quota errors
+  }
 }
 
 export default function PreviewIntakePage() {
@@ -67,17 +54,104 @@ export default function PreviewIntakePage() {
   const industry: Industry =
     (selectedId ? getClientIndustry(selectedId) : null) ?? "legal_tech";
 
-  const answers = useSyncExternalStore(
-    subscribeToPreviewAnswers,
-    readPreviewAnswers,
-    () => EMPTY_PREVIEW_ANSWERS,
+  // `hydrateToken` flips whenever we load a fresh set of answers for the
+  // current engagement so the questionnaire remounts with new initial data.
+  const [hydrateToken, setHydrateToken] = useState(0);
+  const [answers, setAnswers] = useState<PreviewAnswers>(EMPTY);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Hydrate on engagement change: seed from local cache, then try to
+  // pull the server copy for the signed-in user and adopt it if present.
+  useEffect(() => {
+    if (!selectedId) return;
+    const local = readLocal(selectedId);
+    setAnswers(local);
+    setHydrateToken((t) => t + 1);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/preview/intake?engagement_id=${encodeURIComponent(selectedId)}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          authenticated: boolean;
+          answers: PreviewAnswers;
+        };
+        if (cancelled || !json.authenticated) return;
+        const server = json.answers ?? {};
+        const hasServer = Object.keys(server).length > 0;
+        const hasLocal = Object.keys(local).length > 0;
+
+        if (hasServer) {
+          setAnswers(server);
+          writeLocal(selectedId, server);
+          setHydrateToken((t) => t + 1);
+        } else if (hasLocal) {
+          // First login on this device with an existing local draft —
+          // push it up so it survives the next logout.
+          void fetch("/api/preview/intake", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              engagement_id: selectedId,
+              answers: local,
+            }),
+          });
+        }
+      } catch {
+        // offline / network — stick with local cache
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
+
+  const handleChange = useCallback(
+    (next: PreviewAnswers) => {
+      if (!selectedId) return;
+      setAnswers(next);
+      writeLocal(selectedId, next);
+
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        void fetch("/api/preview/intake", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ engagement_id: selectedId, answers: next }),
+        }).catch(() => {
+          // offline or signed out — local cache still holds the draft
+        });
+      }, 600);
+    },
+    [selectedId],
   );
 
-  const handleChange = (next: PreviewAnswers) => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(PREVIEW_INTAKE_STORAGE_KEY, JSON.stringify(next));
-    notifyPreviewAnswersChanged();
-  };
+  // Flush pending server write before the tab goes away.
+  useEffect(() => {
+    const flush = () => {
+      if (!saveTimer.current || !selectedId) return;
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      try {
+        navigator.sendBeacon?.(
+          "/api/preview/intake",
+          new Blob(
+            [JSON.stringify({ engagement_id: selectedId, answers })],
+            { type: "application/json" },
+          ),
+        );
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener("beforeunload", flush);
+    return () => window.removeEventListener("beforeunload", flush);
+  }, [answers, selectedId]);
 
   const buildIntakePayload = useCallback(() => {
     const asArray = (v: PreviewAnswers[string] | undefined): string[] =>
@@ -148,6 +222,7 @@ export default function PreviewIntakePage() {
         description="Comprehensive intake with industry-specific depth, preselected options, and optional free-form context at each prompt to build stronger platform intelligence."
       />
       <IntakeQuestionnaire
+        key={`${selectedId}:${hydrateToken}`}
         industry={industry}
         initialAnswers={answers}
         onChange={handleChange}

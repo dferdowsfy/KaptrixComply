@@ -24,8 +24,13 @@ export default function PreviewInsightsPage() {
   const insights = snapshot?.knowledgeInsights ?? demoKnowledgeInsights;
 
   const handleInsertToIntake = (insight: KnowledgeInsight) => {
-    if (typeof window === "undefined") return;
-    const raw = window.localStorage.getItem(PREVIEW_INTAKE_STORAGE_KEY);
+    if (typeof window === "undefined" || !selectedId) return;
+    // Match the intake page's per-engagement storage key so the insert
+    // lands in the draft the user is actually editing, not the legacy
+    // global bucket.
+    const key = `kaptrix.preview.intake.answers.v2:${selectedId}`;
+    const legacyRaw = window.localStorage.getItem(PREVIEW_INTAKE_STORAGE_KEY);
+    const raw = window.localStorage.getItem(key) ?? legacyRaw;
     let answers: PreviewAnswers = {};
 
     if (raw) {
@@ -37,7 +42,15 @@ export default function PreviewInsightsPage() {
     }
 
     const next = mergeInsightIntoAnswers(answers, insight);
-    window.localStorage.setItem(PREVIEW_INTAKE_STORAGE_KEY, JSON.stringify(next));
+    window.localStorage.setItem(key, JSON.stringify(next));
+
+    // Best-effort mirror to Supabase for signed-in users so the update
+    // survives logout. Failure is silent — the local write is canonical.
+    void fetch("/api/preview/intake", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ engagement_id: selectedId, answers: next }),
+    }).catch(() => {});
   };
 
   const buildPayload = useCallback(() => {
