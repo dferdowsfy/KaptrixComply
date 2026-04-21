@@ -10,12 +10,20 @@ import { ProfileMenu } from "@/components/preview/profile-menu";
 import { NavSettingsMenu } from "@/components/preview/nav-settings-menu";
 import { KbActivityIndicator } from "@/components/preview/kb-activity-indicator";
 import { ReportGenerationBanner } from "@/components/reports/report-generation-banner";
+import { useChatPanel } from "@/components/preview/chat-panel-context";
 
-export function PreviewShell({ children }: { children: React.ReactNode }) {
+export function PreviewShell({
+  children,
+  chatPanel,
+}: {
+  children: React.ReactNode;
+  chatPanel?: React.ReactNode;
+}) {
   const pathname = usePathname();
   const { client, ready } = useSelectedPreviewClient();
   const { visibleTabs } = useNavVisibility();
   const isHome = pathname === "/preview";
+  const chatCtx = useChatPanel();
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -101,6 +109,23 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
             </ul>
           </nav>
           <div className="flex shrink-0 items-center gap-2">
+            {/* Ask AI button — opens the side panel */}
+            <button
+              type="button"
+              onClick={() => chatCtx.setOpen((o) => !o)}
+              className={`group relative inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                chatCtx.open
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "border border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-400 hover:bg-indigo-100"
+              }`}
+              aria-label={chatCtx.open ? "Close Kaptrix AI" : "Open Kaptrix AI"}
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              Ask AI
+            </button>
             <Link
               href="/how-it-works"
               className="group relative hidden items-center rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-indigo-700 transition sm:inline-flex"
@@ -121,9 +146,24 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:px-6 sm:py-8 sm:pb-24">
-        {children}
-      </main>
+      <div className="flex min-h-0 flex-1">
+        <main className={`mx-auto flex-1 px-4 py-6 pb-28 transition-all duration-300 sm:px-6 sm:py-8 sm:pb-24 ${chatCtx.open && chatPanel ? "max-w-5xl" : "max-w-7xl"}`}>
+          {children}
+        </main>
+
+        {/* Chat side panel */}
+        {chatPanel && (
+          <aside
+            className={`print-hide fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-slate-200 bg-slate-900 shadow-xl transition-transform duration-300 sm:w-[420px] lg:relative lg:w-[420px] lg:shadow-none ${
+              chatCtx.open
+                ? "translate-x-0"
+                : "pointer-events-none translate-x-full lg:hidden"
+            }`}
+          >
+            {chatPanel}
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

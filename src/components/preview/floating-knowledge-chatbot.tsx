@@ -18,6 +18,7 @@ import {
   type KnowledgeEntry,
   type KnowledgeStep,
 } from "@/lib/preview/knowledge-base";
+import { useChatPanel } from "@/components/preview/chat-panel-context";
 
 const EMPTY_KB: Partial<Record<KnowledgeStep, KnowledgeEntry>> = {};
 
@@ -55,8 +56,8 @@ function getSessionId(): string {
   }
 }
 
-export function FloatingKnowledgeChatbot() {
-  const [isOpen, setIsOpen] = useState(false);
+export function KnowledgeChatPanel() {
+  const { open: isOpen, setOpen } = useChatPanel();
   const [query, setQuery] = useState("");
   const { client, selectedId } = useSelectedPreviewClient();
   const { snapshot } = usePreviewSnapshot(selectedId);
@@ -296,57 +297,36 @@ export function FloatingKnowledgeChatbot() {
   };
 
   return (
-    <div className="print-hide fixed bottom-4 right-4 z-50 sm:bottom-5 sm:right-5">
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="group flex items-center gap-2 rounded-full bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(99,102,241,0.45)] transition-all hover:scale-105 hover:shadow-[0_12px_32px_rgba(139,92,246,0.55)]"
-          aria-label="Open Kaptrix AI chat"
-        >
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
-          </span>
-          Ask Kaptrix AI
-        </button>
-      )}
-
-      {isOpen && (
-        <div
-          className="
-            fixed inset-x-3 bottom-3 top-16 z-50 flex flex-col overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-900 shadow-2xl ring-1 ring-black/40
-            sm:static sm:inset-auto sm:h-[680px] sm:w-[520px]
-          "
-        >
-          {/* Header */}
-          <div className="border-b border-slate-700/60 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-5 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-base font-bold text-white shadow-lg">
-                  K
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-white">
-                    Kaptrix AI
-                  </p>
-                  <p className="flex items-center gap-1.5 truncate text-xs text-slate-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                    Grounded in {client.target}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="ml-2 rounded-md p-1.5 text-slate-400 transition hover:bg-slate-700/60 hover:text-white"
-                aria-label="Close chatbot"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+    <>
+      {/* Header */}
+      <div className="border-b border-slate-700/60 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-5 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-base font-bold text-white shadow-lg">
+              K
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold text-white">
+                Kaptrix AI
+              </p>
+              <p className="flex items-center gap-1.5 truncate text-xs text-slate-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+                Grounded in {client.target}
+              </p>
             </div>
           </div>
+          <button
+            onClick={() => setOpen(false)}
+            className="ml-2 rounded-md p-1.5 text-slate-400 transition hover:bg-slate-700/60 hover:text-white"
+            aria-label="Close chatbot"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
           {/* Messages */}
           <div
@@ -481,11 +461,12 @@ export function FloatingKnowledgeChatbot() {
               Responses grounded in diligence evidence.
             </p>
           </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
+
+/** @deprecated Use KnowledgeChatPanel instead */
+export const FloatingKnowledgeChatbot = KnowledgeChatPanel;
 
 function answerFromCorpus(
   question: string,

@@ -205,13 +205,14 @@ export default function HomePage() {
               <Link href="/contact" className={BTN_PRIMARY_ON_DARK}>
                 Start a diligence engagement
               </Link>
-              <Link href="/how-it-works" className={BTN_SECONDARY_ON_DARK}>
+              <Link href="/preview/report" className={BTN_SECONDARY_ON_DARK}>
                 See a sample report
               </Link>
               <Link
                 href="/preview"
-                className="ml-1 text-base font-medium text-indigo-200 underline decoration-indigo-400/40 underline-offset-4 transition hover:text-white hover:decoration-indigo-300"
+                className="ml-1 inline-flex items-center gap-2 rounded-full border-2 border-indigo-400/60 bg-white/10 px-5 py-2.5 text-base font-semibold text-white backdrop-blur transition hover:border-white hover:bg-white/20"
               >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="-ml-0.5"><polygon points="6 4 20 12 6 20 6 4" /></svg>
                 Try the demo
               </Link>
             </div>
@@ -412,8 +413,8 @@ export default function HomePage() {
 
           <Reveal delay={120}>
             <div className="mt-10">
-              <Link href="/contact?intent=sample" className={BTN_PRIMARY}>
-                Request a sample report
+              <Link href="/preview/report" className={BTN_PRIMARY}>
+                See a sample report
               </Link>
             </div>
           </Reveal>
@@ -666,8 +667,8 @@ export default function HomePage() {
                 <Link href="/contact" className={BTN_PRIMARY}>
                   Start a diligence engagement
                 </Link>
-                <Link href="/contact?intent=sample" className={BTN_SECONDARY}>
-                  Request a sample report
+                <Link href="/preview/report" className={BTN_SECONDARY}>
+                  See a sample report
                 </Link>
               </div>
             </div>
