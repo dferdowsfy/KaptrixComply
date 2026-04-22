@@ -10,6 +10,7 @@ import {
   formatKnowledgeBaseEvidence,
   readClientKb,
   subscribeKnowledgeBase,
+  KNOWLEDGE_STEP_LABELS,
   type KnowledgeEntry,
   type KnowledgeStep,
 } from "@/lib/preview/knowledge-base";
@@ -24,10 +25,33 @@ export default function PreviewReportPage() {
     () => readClientKb(selectedId),
     () => EMPTY_KB,
   );
-  const knowledgeBaseText = formatKnowledgeBaseEvidence(kb).join("\n");
+
+  // Context-engine contract: only include non-stale stages in the
+  // evidence text fed to report generation. Stale derivations must
+  // not appear in a deliverable — the operator should recompute
+  // upstream first.
+  const staleSteps = (Object.keys(kb) as KnowledgeStep[]).filter(
+    (s) => kb[s]?.stale,
+  );
+  const freshKb = Object.fromEntries(
+    (Object.entries(kb) as [KnowledgeStep, KnowledgeEntry | undefined][]).filter(
+      ([, entry]) => entry && !entry.stale,
+    ),
+  ) as Partial<Record<KnowledgeStep, KnowledgeEntry>>;
+  const knowledgeBaseText = formatKnowledgeBaseEvidence(freshKb).join("\n");
 
   return (
     <div className="space-y-10">
+      {staleSteps.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+          <span className="font-semibold">Some knowledge-base stages are stale.</span>{" "}
+          {staleSteps
+            .map((s) => KNOWLEDGE_STEP_LABELS[s])
+            .join(", ")}{" "}
+          were invalidated by upstream changes. Reports generated now will exclude
+          stale stages. Recompute them first for a complete deliverable.
+        </div>
+      )}
       {/* On-demand reports live at the top so they are immediately
           discoverable when the operator lands on the Reports page. */}
       <section

@@ -536,7 +536,13 @@ export function formatKnowledgeBaseEvidence(
     const entry = kb[step];
     if (!entry) return;
     const label = KNOWLEDGE_STEP_LABELS[step];
-    lines.push(`[knowledge base · ${label}] ${entry.summary}`);
+    // Context-engine contract: if a stage is stale (upstream rewrote
+    // after this stage was derived), mark it explicitly so downstream
+    // consumers (LLM prompts, chat, reports) can discount or skip it.
+    const staleTag = entry.stale
+      ? ` [STALE — upstream ${(entry.stale_because ?? []).map((s) => KNOWLEDGE_STEP_LABELS[s]).join(", ")} changed since this was computed]`
+      : "";
+    lines.push(`[knowledge base · ${label}${staleTag}] ${entry.summary}`);
     const p = entry.payload;
     if (p.kind === "intake") {
       const emitList = (label: string, arr: string[] | undefined) => {

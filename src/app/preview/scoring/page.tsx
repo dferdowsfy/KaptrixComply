@@ -15,6 +15,7 @@ import {
   KNOWLEDGE_STEP_LABELS,
   submitScoringToKnowledgeBase,
   isStageDirty,
+  currentContextSlice,
   type KnowledgeEntry,
   type KnowledgeStep,
 } from "@/lib/preview/knowledge-base";
@@ -39,7 +40,7 @@ export default function PreviewScoringPage() {
     () => readClientKb(selectedId),
     () => EMPTY_KB,
   );
-  const contextSignals = deriveContextSignals(kb);
+  const contextSignals = deriveContextSignals(currentContextSlice(kb, "scoring"));
   const submittedSteps = (Object.keys(kb) as KnowledgeStep[]).filter(
     (k) => kb[k],
   );
@@ -64,9 +65,9 @@ export default function PreviewScoringPage() {
           <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
             <span className="font-semibold">Upstream context changed.</span>{" "}
             {scoringDirty.dirty
-              ? `Scoring was computed against an earlier version of ${scoringDirty.reasons
+              ? `${scoringDirty.reasons
                   .map((r) => KNOWLEDGE_STEP_LABELS[r])
-                  .join(", ")}. Re-save the scores to refresh the composite against the current intake/evidence.`
+                  .join(", ")} updated — the context-aware composite is recomputing automatically. Manual score overrides are preserved.`
               : `Re-submit ${staleUpstream
                   .map((r) => KNOWLEDGE_STEP_LABELS[r])
                   .join(", ")} to clear the stale flag before scoring downstream stages.`}

@@ -234,7 +234,21 @@ export function KnowledgeChatPanel() {
       .map((c) => `[${c.source}] ${c.text}`)
       .join("\n");
     const knowledgeBaseText = [
-      ...formatKnowledgeBaseEvidence(kb),
+      // Context-engine contract: exclude stale derived stages from the
+      // evidence text sent to the LLM so it doesn't ground answers in
+      // superseded derivations. Stale entries are still visible in the
+      // corpus via the stale annotation, but the LLM prompt only sees
+      // fresh data. Primary upstream stages (intake, pre_analysis) are
+      // never excluded — only derived stages (scoring, positioning,
+      // coverage, insights) that haven't been recomputed since upstream
+      // changed.
+      ...formatKnowledgeBaseEvidence(
+        Object.fromEntries(
+          (Object.entries(kb) as [KnowledgeStep, KnowledgeEntry | undefined][]).filter(
+            ([, entry]) => entry && !entry.stale,
+          ),
+        ),
+      ),
       ...formatUploadedDocsEvidence(selectedId),
     ].join("\n");
 
