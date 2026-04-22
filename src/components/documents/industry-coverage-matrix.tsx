@@ -157,15 +157,14 @@ export function IndustryCoverageMatrix({
     return byCat;
   }, [uploadedDocs]);
 
-  // Standalone JSX for the custom-artifact uploader. Rendered above the
-  // coverage table so operators find it without scrolling past the full
-  // required-artifact list.
+  // Standalone JSX for the custom-artifact uploader. Rendered below the
+  // coverage table.
   const customArtifactCard = (
     <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/60 via-white to-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700">
-            Other artifact · upload anything
+            Upload Artifact
           </p>
           <h3 className="mt-1 text-base font-semibold text-slate-900">
             Upload a custom artifact
@@ -401,10 +400,6 @@ export function IndustryCoverageMatrix({
         </div>
       </div>
 
-      {/* Custom artifact upload — placed above the coverage table so it's
-         always visible without scrolling past the full required list. */}
-      {customArtifactCard}
-
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
         <table className="w-full">
           <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
@@ -525,6 +520,9 @@ export function IndustryCoverageMatrix({
           </tbody>
         </table>
       </div>
+
+      {/* Custom artifact upload — below the coverage table */}
+      {customArtifactCard}
     </div>
   );
 }
