@@ -95,12 +95,16 @@ export function useNavVisibility(initialServerHidden: NavTabId[] = EMPTY) {
         });
     };
     load();
+    // Poll every 30 s so admin-enforced hides propagate even when the user
+    // stays on the same page without navigating or focusing.
+    const interval = setInterval(load, 30_000);
     const onFocus = () => load();
     if (typeof window !== "undefined") {
       window.addEventListener("focus", onFocus);
     }
     return () => {
       cancelled = true;
+      clearInterval(interval);
       if (typeof window !== "undefined") {
         window.removeEventListener("focus", onFocus);
       }
