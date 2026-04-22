@@ -1,19 +1,21 @@
 // ------------------------------------------------------------------
-// System Signals
+// System Signals — Key Changes Engine
 //
-// Derives auditable, dimension-anchored "what just changed in the
-// model" events from diffs of the preview knowledge base. Every
-// signal maps back to one of the 6 scoring dimensions, a specific
-// sub-criterion, or a named artifact requirement. No generic phrases.
+// Derives material, decision-relevant changes from diffs of the
+// preview knowledge base. Every change maps to a scoring dimension,
+// a specific risk area, or a named artifact requirement.
 //
-// Consumer: src/hooks/use-system-signals.ts
-//           src/components/preview/system-signal-pill.tsx
+// Design principles:
+//  - Materiality filter: only surface changes that affect IC outcome
+//  - Aggregation: one insight per risk area / dimension
+//  - No numeric deltas, weights, or internal scoring mechanics
+//  - Analyst tone throughout — IC-ready language
+//  - Investment translation on every Score Impact item
 // ------------------------------------------------------------------
 
 import type { ScoreDimension } from "@/lib/types";
 import type {
   CoveragePayload,
-  InsightsPayload,
   IntakePayload,
   KnowledgeEntry,
   KnowledgeStep,
@@ -24,294 +26,518 @@ export type ClientKb = Partial<Record<KnowledgeStep, KnowledgeEntry>>;
 
 export const DIMENSION_SHORT_LABEL: Record<ScoreDimension, string> = {
   product_credibility: "Product Credibility",
-  tooling_exposure: "Tooling & Vendor Exposure",
-  data_sensitivity: "Data Risk",
-  governance_safety: "Governance & Safety",
+  tooling_exposure:    "Tooling & Vendor Exposure",
+  data_sensitivity:    "Data Risk",
+  governance_safety:   "Governance & Safety",
   production_readiness: "Production Readiness",
-  open_validation: "Open Validation",
+  open_validation:     "Open Validation",
 };
 
-export interface RiskSignal {
-  label: string;           // the actual finding, e.g. "No data isolation policy identified"
-  dimension: ScoreDimension;
-  severity: "critical" | "high" | "medium";
-  source: "intake" | "pre_analysis";
-}
+// ─── Investment implication map ──────────────────────────────────────────────
+// Plain-English implication for each dimension+direction. No scoring language.
+const IMPLICATION: Record<ScoreDimension, Record<"up" | "down", string>> = {
+  product_credibility: {
+    up:   "Evidence supports AI differentiation claims — strengthens the core investment thesis",
+    down: "AI value claims require additional validation — weakens the primary investment thesis",
+  },
+  tooling_exposure: {
+    up:   "Vendor risk is well-managed — abstraction and fallback reduce concentration exposure",
+    down: "Vendor lock-in risk elevated — reduces negotiating leverage and complicates exit planning",
+  },
+  data_sensitivity: {
+    up:   "Data practices appropriate for sensitivity level — reduces regulatory and compliance friction",
+    down: "Data handling risk identified — regulated-sector deployments may face compliance delays",
+  },
+  governance_safety: {
+    up:   "Governance posture supports enterprise deals — compliance and oversight are in place",
+    down: "Compliance risk elevated — may impact enterprise adoption and audit readiness",
+  },
+  production_readiness: {
+    up:   "Infrastructure can absorb anticipated scale — production readiness supports the growth thesis",
+    down: "Scalability confidence weakened — cost and reliability at scale remain unvalidated",
+  },
+  open_validation: {
+    up:   "Validation coverage improving — diligence is converging toward a decision-ready state",
+    down: "Diligence completeness reduced — IC memo will carry material open questions",
+  },
+};
 
-export interface GapSignal {
-  artifact: string;        // e.g. "AI roadmap", "ROI / business case model"
+// Priority weight: lower = more impactful to the investment decision
+const DIM_PRIORITY: Record<ScoreDimension, number> = {
+  data_sensitivity:     1,
+  governance_safety:    1,
+  open_validation:      2,
+  tooling_exposure:     2,
+  production_readiness: 3,
+  product_credibility:  3,
+};
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export type KeyChangeSeverity = "critical" | "important";
+export type KeyChangeLifecycle = "new" | "updated" | "resolved";
+export type KeyChangeCategory  = "risk" | "score_impact" | "gap";
+
+export interface KeyChange {
+  /** Stable topic-based fingerprint for dedup */
+  id: string;
+  category: KeyChangeCategory;
+  severity: KeyChangeSeverity;
+  lifecycle: KeyChangeLifecycle;
+  /** Rank within the batch — 1 = highest investment impact */
+  priority: number;
   dimension?: ScoreDimension;
+  direction?: "up" | "down";
+  /** One-liner analyst headline */
+  headline: string;
+  /** Why this change was triggered (evidence linkage) */
+  reason: string;
+  /** Investment-level implication — no scoring math */
+  implication: string;
+  /** KB step that triggered this */
+  evidence_source: string;
+  /** Drill-down items (hidden by default) */
+  supporting_items?: string[];
 }
 
-export interface ModelAdjustmentSignal {
-  dimension: ScoreDimension;
+export interface ConfidenceShift {
   direction: "up" | "down";
-  /** Weight delta on the 0–5 composite scale, always positive (direction conveys sign). */
-  delta: number;
-  reason: string;          // e.g. "Corporate IC context", "Vendor concentration prioritized"
+  headline: string;
+  reason: string;
 }
 
-export interface KnowledgeSignal {
-  count: number;
-  source: "intake" | "coverage" | "insights" | "pre_analysis" | "positioning";
-}
-
-export interface SystemSignalBatch {
+export interface KeyChangesBatch {
   id: string;
   created_at: string;
-  risks: RiskSignal[];
-  gaps: GapSignal[];
-  adjustments: ModelAdjustmentSignal[];
-  knowledge: KnowledgeSignal[];
+  /** Single sentence capturing the most important shift — shown at top of panel */
+  primaryInsight: string;
+  /** All changes, sorted by priority ascending */
+  changes: KeyChange[];
+  /** Separate confidence track — not folded into Score Impact */
+  confidenceShift: ConfidenceShift | null;
+  /** Whether there are more changes beyond the 3+3 display cap */
+  hasMore: boolean;
 }
 
-// ------------------------------------------------------------------
-// Intake → dimension-weight adjustments.
-// These encode how the model re-weights evidence given engagement
-// context. Every entry is auditable (operator sees the exact trigger).
-// ------------------------------------------------------------------
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function engagementTypeAdjustments(prev: string | undefined, next: string | undefined): ModelAdjustmentSignal[] {
-  if (!next || next === prev) return [];
-  const out: ModelAdjustmentSignal[] = [];
-  if (next.startsWith("Corporate IC")) {
-    out.push({ dimension: "product_credibility", direction: "up",   delta: 0.20, reason: "Corporate IC context" });
-    out.push({ dimension: "governance_safety",   direction: "down", delta: 0.15, reason: "Corporate IC context — governance carried by buyer" });
-  } else if (next.startsWith("PE") || next.startsWith("Growth") || next.startsWith("Portfolio")) {
-    out.push({ dimension: "open_validation",      direction: "up", delta: 0.25, reason: "PE diligence posture" });
-    out.push({ dimension: "production_readiness", direction: "up", delta: 0.20, reason: "PE diligence posture" });
-  } else if (next.startsWith("Vendor selection")) {
-    out.push({ dimension: "tooling_exposure",     direction: "up", delta: 0.30, reason: "Vendor-selection context" });
-    out.push({ dimension: "production_readiness", direction: "up", delta: 0.20, reason: "Vendor-selection context" });
-  }
-  return out;
+function slug(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 40);
 }
 
-function buyerArchetypeAdjustments(prev: string | undefined, next: string | undefined): ModelAdjustmentSignal[] {
-  if (!next || next === prev) return [];
-  if (/SMB/i.test(next)) {
-    return [{ dimension: "production_readiness", direction: "down", delta: 0.15, reason: "SMB operator — lighter production bar" }];
-  }
-  if (/Large-cap PE|Growth equity/i.test(next)) {
-    return [{ dimension: "open_validation", direction: "up", delta: 0.20, reason: `${next} audience` }];
-  }
-  return [];
-}
+// ─── Risk derivation ─────────────────────────────────────────────────────────
 
-const PRIORITY_TO_DIMENSION: Record<string, ScoreDimension> = {
-  "Are AI claims real or marketing?": "product_credibility",
-  "Vendor / model concentration": "tooling_exposure",
-  "Regulatory exposure": "data_sensitivity",
-  "Data sensitivity and tenant isolation": "data_sensitivity",
-  "Data rights and IP provenance": "data_sensitivity",
-  "Unit economics at scale": "production_readiness",
-  "Enterprise sales readiness": "production_readiness",
-  "Integration with existing stack": "production_readiness",
-  "Competitive defensibility": "product_credibility",
-  "Internal team readiness to operate": "governance_safety",
-  "Key-person risk": "governance_safety",
-};
+function deriveIntakeRisks(
+  prevIntake: IntakePayload | undefined,
+  nextIntake: IntakePayload,
+): KeyChange[] {
+  const out: KeyChange[] = [];
 
-function diligencePriorityAdjustments(prev: string[] | undefined, next: string[] | undefined): ModelAdjustmentSignal[] {
-  const p = new Set(prev ?? []);
-  const added = (next ?? []).filter((x) => !p.has(x));
-  const out: ModelAdjustmentSignal[] = [];
-  for (const item of added) {
-    const dim = PRIORITY_TO_DIMENSION[item];
-    if (!dim) continue;
-    out.push({ dimension: dim, direction: "up", delta: 0.15, reason: `Client prioritized "${item}"` });
-  }
-  return out;
-}
-
-// ------------------------------------------------------------------
-// Intake risk signals (from regulatory exposure + red flag priors).
-// ------------------------------------------------------------------
-
-function intakeRiskDiff(prev: IntakePayload | undefined, next: IntakePayload): RiskSignal[] {
-  const prevReg = new Set(prev?.regulatory_exposure ?? []);
-  const prevFlags = new Set(prev?.red_flag_priors ?? []);
-  const out: RiskSignal[] = [];
-  for (const r of next.regulatory_exposure) {
-    if (prevReg.has(r)) continue;
+  // Regulatory exposure — aggregate all new ones into ONE change
+  const prevReg  = new Set(prevIntake?.regulatory_exposure ?? []);
+  const newReg   = nextIntake.regulatory_exposure.filter((r) => !prevReg.has(r));
+  if (newReg.length > 0) {
+    const sev: KeyChangeSeverity = newReg.length >= 3 ? "critical" : "important";
     out.push({
-      label: `Regulatory exposure: ${r}`,
+      id: "risk:intake:regulatory",
+      category: "risk",
+      severity: sev,
+      lifecycle: "new",
+      priority: sev === "critical" ? 1 : 2,
       dimension: "data_sensitivity",
-      severity: "high",
-      source: "intake",
+      direction: "down",
+      headline:
+        newReg.length === 1
+          ? `Regulatory exposure identified — ${newReg[0]}`
+          : `Regulatory exposure confirmed across ${newReg.length} frameworks`,
+      reason: `Intake flagged: ${newReg.join(", ")}`,
+      implication: IMPLICATION.data_sensitivity.down,
+      evidence_source: "Intake · Regulatory Exposure",
+      supporting_items: newReg,
     });
   }
-  for (const f of next.red_flag_priors) {
-    if (prevFlags.has(f)) continue;
+
+  // Prior red flags — aggregate into ONE change
+  const prevFlags = new Set(prevIntake?.red_flag_priors ?? []);
+  const newFlags  = nextIntake.red_flag_priors.filter((f) => !prevFlags.has(f));
+  if (newFlags.length > 0) {
     out.push({
-      label: `Prior red-flag concern: ${f}`,
+      id: "risk:intake:red_flags",
+      category: "risk",
+      severity: "important",
+      lifecycle: "new",
+      priority: 3,
       dimension: "open_validation",
-      severity: "medium",
-      source: "intake",
+      direction: "down",
+      headline: `Prior concern${newFlags.length > 1 ? "s" : ""} flagged — validation required in this engagement`,
+      reason: `${newFlags.length} prior red-flag concern${newFlags.length > 1 ? "s" : ""} carried from intake`,
+      implication: IMPLICATION.open_validation.down,
+      evidence_source: "Intake · Prior Red Flags",
+      supporting_items: newFlags,
     });
   }
+
   return out;
 }
 
-// ------------------------------------------------------------------
-// Pre-analysis red flags → risk signals (dimension-anchored).
-// ------------------------------------------------------------------
+function derivePreAnalysisRisks(
+  prevPa: PreAnalysisPayload | undefined,
+  nextPa: PreAnalysisPayload,
+): KeyChange[] {
+  const prevCritSet = new Set((prevPa?.critical_red_flags ?? []).map((f) => f.flag));
+  const prevHighSet = new Set((prevPa?.high_red_flags   ?? []).map((f) => f.flag));
 
-function preAnalysisRiskDiff(
-  prev: PreAnalysisPayload | undefined,
-  next: PreAnalysisPayload,
-): RiskSignal[] {
-  const prevCrit = new Set((prev?.critical_red_flags ?? []).map((f) => f.flag));
-  const prevHigh = new Set((prev?.high_red_flags ?? []).map((f) => f.flag));
-  const out: RiskSignal[] = [];
-  for (const f of next.critical_red_flags) {
-    if (prevCrit.has(f.flag) || !f.dimension) continue;
-    out.push({ label: f.flag, dimension: f.dimension, severity: "critical", source: "pre_analysis" });
+  const newCrit = nextPa.critical_red_flags.filter((f) => !prevCritSet.has(f.flag));
+  const newHigh = nextPa.high_red_flags.filter(
+    (f) => !prevHighSet.has(f.flag) && !prevCritSet.has(f.flag),
+  );
+
+  const out: KeyChange[] = [];
+
+  // Group critical flags by dimension — one change per dimension
+  const critByDim = new Map<ScoreDimension | null, string[]>();
+  for (const f of newCrit) {
+    critByDim.set(f.dimension, [...(critByDim.get(f.dimension) ?? []), f.flag]);
   }
-  for (const f of next.high_red_flags) {
-    if (prevHigh.has(f.flag) || !f.dimension) continue;
-    out.push({ label: f.flag, dimension: f.dimension, severity: "high", source: "pre_analysis" });
+  for (const [dim, flags] of critByDim.entries()) {
+    const dimLabel = dim ? DIMENSION_SHORT_LABEL[dim] : "multiple areas";
+    const basePri  = dim ? DIM_PRIORITY[dim] : 1;
+    out.push({
+      id: `risk:pa:critical:${dim ?? "cross"}`,
+      category: "risk",
+      severity: "critical",
+      lifecycle: "new",
+      priority: basePri,
+      dimension: dim ?? undefined,
+      direction: "down",
+      headline:
+        flags.length === 1
+          ? `Critical risk identified — ${dimLabel}`
+          : `${flags.length} critical findings in ${dimLabel}`,
+      reason: flags.length === 1 ? flags[0] : `${flags.length} critical findings identified in pre-analysis`,
+      implication: dim ? IMPLICATION[dim].down : "May materially affect investment viability — targeted validation required",
+      evidence_source: "Pre-Analysis · Document Review",
+      supporting_items: flags,
+    });
   }
+
+  // Group high flags by dimension — suppress singletons if already critical-heavy
+  const highByDim = new Map<ScoreDimension | null, string[]>();
+  for (const f of newHigh) {
+    highByDim.set(f.dimension, [...(highByDim.get(f.dimension) ?? []), f.flag]);
+  }
+  for (const [dim, flags] of highByDim.entries()) {
+    // Materiality: suppress lone high flag if there are already 3+ critical changes
+    if (flags.length === 1 && newCrit.length >= 3) continue;
+    const dimLabel = dim ? DIMENSION_SHORT_LABEL[dim] : "multiple areas";
+    const basePri  = (dim ? DIM_PRIORITY[dim] : 2) + 1;
+    out.push({
+      id: `risk:pa:high:${dim ?? "cross"}`,
+      category: "risk",
+      severity: "important",
+      lifecycle: "new",
+      priority: basePri,
+      dimension: dim ?? undefined,
+      direction: "down",
+      headline: flags.length === 1 ? `Risk identified — ${dimLabel}` : `${flags.length} findings in ${dimLabel}`,
+      reason: flags.length === 1 ? flags[0] : `${flags.length} findings identified in pre-analysis`,
+      implication: dim ? IMPLICATION[dim].down : "Requires targeted validation before IC submission",
+      evidence_source: "Pre-Analysis · Document Review",
+      supporting_items: flags,
+    });
+  }
+
   return out;
 }
 
-// ------------------------------------------------------------------
-// Coverage → gap signals. New missing artifacts only.
-// ------------------------------------------------------------------
+// ─── Score Impact derivation ─────────────────────────────────────────────────
+// One aggregated change per trigger — no numeric values.
 
-function coverageGapDiff(
-  prev: CoveragePayload | undefined,
-  next: CoveragePayload,
-): GapSignal[] {
-  const prevGaps = new Set(prev?.gap_summaries ?? []);
-  return next.gap_summaries
-    .filter((g) => !prevGaps.has(g))
-    .map((artifact) => ({ artifact }));
+function deriveScoreImpacts(
+  prevIntake: IntakePayload | undefined,
+  nextIntake: IntakePayload,
+): KeyChange[] {
+  const out: KeyChange[] = [];
+
+  // Engagement type — ONE aggregated change
+  if (nextIntake.engagement_type && nextIntake.engagement_type !== prevIntake?.engagement_type) {
+    const et = nextIntake.engagement_type;
+    let headline     = "";
+    let reason       = "";
+    let implication  = "";
+    let supporting: string[] = [];
+
+    if (et.startsWith("Corporate IC")) {
+      headline    = "Analysis calibrated for Corporate IC engagement";
+      reason      = "Engagement type set to Corporate IC — findings will be framed for an investment committee audience";
+      implication = "Evidence collection should prioritise AI value proof, customer validation, and governance readiness";
+      supporting  = [
+        "Product Credibility — primary focus on AI differentiation and claim substantiation",
+        "Governance & Safety — weighted for IC committee readiness, not day-to-day operations",
+      ];
+    } else if (et.startsWith("PE") || et.startsWith("Growth") || et.startsWith("Portfolio")) {
+      headline    = "Analysis calibrated for PE / Growth Equity diligence";
+      reason      = "Engagement type set to PE diligence — findings will be framed for investment thesis validation";
+      implication = "Evidence collection should prioritise production proof, scalability, and exit readiness";
+      supporting  = [
+        "Open Validation — higher evidence bar required before IC",
+        "Production Readiness — stress-tested for growth and scale trajectory",
+      ];
+    } else if (et.startsWith("Vendor selection")) {
+      headline    = "Analysis calibrated for Vendor Selection evaluation";
+      reason      = "Engagement type set to vendor selection — fit, risk, and switching costs are the primary lens";
+      implication = "Vendor lock-in, integration complexity, and contract terms will receive elevated scrutiny";
+      supporting  = [
+        "Tooling & Vendor Exposure — primary focus on concentration risk and switching costs",
+        "Production Readiness — evaluated against buyer's operational requirements",
+      ];
+    } else {
+      return out;
+    }
+
+    out.push({
+      id: "impact:engagement_type",
+      category: "score_impact",
+      severity: "important",
+      lifecycle: "new",
+      priority: 4,
+      headline,
+      reason,
+      implication,
+      evidence_source: "Intake · Engagement Type",
+      supporting_items: supporting,
+    });
+  }
+
+  // Diligence priorities — ONE aggregated change (only if ≥ 2 new)
+  const prevPri = new Set(prevIntake?.diligence_priorities ?? []);
+  const newPri  = (nextIntake.diligence_priorities ?? []).filter((p) => !prevPri.has(p));
+  if (newPri.length >= 2) {
+    out.push({
+      id: "impact:diligence_priorities",
+      category: "score_impact",
+      severity: "important",
+      lifecycle: "new",
+      priority: 5,
+      headline: `Analysis depth weighted toward ${newPri.length} client-specified risk areas`,
+      reason: `Intake prioritised: ${newPri.slice(0, 3).join(", ")}${newPri.length > 3 ? ", and more" : ""}`,
+      implication: "Evidence gaps in these areas will receive critical attention — collect targeted artifacts before IC submission",
+      evidence_source: "Intake · Diligence Priorities",
+      supporting_items: newPri,
+    });
+  }
+
+  return out;
 }
 
-// ------------------------------------------------------------------
-// Knowledge-base growth: count of new evidence items per source.
-// ------------------------------------------------------------------
+// ─── Coverage gap derivation ─────────────────────────────────────────────────
 
-function knowledgeDelta(prev: ClientKb, next: ClientKb): KnowledgeSignal[] {
-  const out: KnowledgeSignal[] = [];
+function deriveCoverageChanges(
+  prevCov: CoveragePayload | undefined,
+  nextCov: CoveragePayload,
+): KeyChange[] {
+  const out: KeyChange[] = [];
 
-  const prevIntake = prev.intake?.payload.kind === "intake" ? prev.intake.payload : undefined;
-  const nextIntake = next.intake?.payload.kind === "intake" ? next.intake.payload : undefined;
-  if (nextIntake) {
-    const delta = nextIntake.answered_fields - (prevIntake?.answered_fields ?? 0);
-    if (delta > 0) out.push({ count: delta, source: "intake" });
+  const prevGaps = new Set(prevCov?.gap_summaries ?? []);
+  const nextGaps = new Set(nextCov.gap_summaries);
+  const newGaps      = [...nextGaps].filter((g) => !prevGaps.has(g));
+  const resolvedGaps = [...prevGaps].filter((g) => !nextGaps.has(g));
+
+  if (newGaps.length > 0) {
+    const sev: KeyChangeSeverity = newGaps.length >= 3 ? "critical" : "important";
+    out.push({
+      id: "gap:coverage:new",
+      category: "gap",
+      severity: sev,
+      lifecycle: "new",
+      priority: sev === "critical" ? 2 : 4,
+      headline:
+        newGaps.length === 1
+          ? `Required artifact not yet provided — ${newGaps[0]}`
+          : `${newGaps.length} required artifacts not yet provided`,
+      reason: "Industry standards for this engagement require these artifacts for complete scoring",
+      implication: "Missing artifacts reduce scoring confidence — collect before final IC submission to avoid unresolved open items",
+      evidence_source: "Coverage · Document Requirements",
+      supporting_items: newGaps,
+    });
   }
 
-  const prevIns = prev.insights?.payload.kind === "insights" ? prev.insights.payload : undefined;
-  const nextIns = next.insights?.payload.kind === "insights" ? next.insights.payload : undefined;
-  if (nextIns) {
-    const delta = nextIns.insights_total - (prevIns?.insights_total ?? 0);
-    if (delta > 0) out.push({ count: delta, source: "insights" });
+  if (resolvedGaps.length > 0) {
+    out.push({
+      id: "gap:coverage:resolved",
+      category: "gap",
+      severity: "important",
+      lifecycle: "resolved",
+      priority: 6,
+      headline:
+        resolvedGaps.length === 1
+          ? `Coverage gap resolved — ${resolvedGaps[0]}`
+          : `${resolvedGaps.length} coverage gaps resolved`,
+      reason: "Previously missing artifacts have been provided",
+      implication: "Scoring confidence increases as evidence coverage improves — diligence completeness is strengthening",
+      evidence_source: "Coverage · Document Requirements",
+      supporting_items: resolvedGaps,
+    });
   }
 
-  const prevPa = prev.pre_analysis?.payload.kind === "pre_analysis" ? prev.pre_analysis.payload : undefined;
-  const nextPa = next.pre_analysis?.payload.kind === "pre_analysis" ? next.pre_analysis.payload : undefined;
-  if (nextPa) {
-    const delta = nextPa.analyses_total - (prevPa?.analyses_total ?? 0);
-    if (delta > 0) out.push({ count: delta, source: "pre_analysis" });
-  }
+  return out;
+}
 
+// ─── Confidence Shift (separate track) ───────────────────────────────────────
+
+function deriveConfidenceShift(prev: ClientKb, next: ClientKb): ConfidenceShift | null {
+  const prevPa  = prev.pre_analysis?.payload.kind === "pre_analysis" ? prev.pre_analysis.payload : undefined;
+  const nextPa  = next.pre_analysis?.payload.kind === "pre_analysis" ? next.pre_analysis.payload : undefined;
   const prevCov = prev.coverage?.payload.kind === "coverage" ? prev.coverage.payload : undefined;
   const nextCov = next.coverage?.payload.kind === "coverage" ? next.coverage.payload : undefined;
-  if (nextCov) {
-    const delta = nextCov.documents_total - (prevCov?.documents_total ?? 0);
-    if (delta > 0) out.push({ count: delta, source: "coverage" });
-  }
 
-  if (!prev.positioning && next.positioning) {
-    const p = next.positioning.payload;
-    if (p.kind === "positioning") {
-      out.push({ count: p.comparables.length, source: "positioning" });
+  // Positive: pre-analysis expanded with no new critical flags
+  if (nextPa && nextPa.analyses_total > (prevPa?.analyses_total ?? 0)) {
+    const newCritCount = nextPa.critical_red_flags.filter(
+      (f) => !(prevPa?.critical_red_flags ?? []).some((p) => p.flag === f.flag),
+    ).length;
+    if (newCritCount === 0 && nextPa.analyses_total >= 3) {
+      return {
+        direction: "up",
+        headline: "Evidence base strengthened",
+        reason: `Pre-analysis completed across ${nextPa.analyses_total} documents — scoring dimensions have stronger evidentiary support`,
+      };
     }
   }
-  return out;
+
+  // Positive: gaps resolved
+  if (prevCov && nextCov && nextCov.gaps_count < prevCov.gaps_count) {
+    const delta = prevCov.gaps_count - nextCov.gaps_count;
+    return {
+      direction: "up",
+      headline: "Coverage gap resolved",
+      reason: `Artifact coverage improved — ${delta} previously missing item${delta > 1 ? "s" : ""} provided`,
+    };
+  }
+
+  // Negative: new critical flags
+  if (nextPa && prevPa) {
+    const newCrit = nextPa.critical_red_flags.filter(
+      (f) => !(prevPa.critical_red_flags ?? []).some((p) => p.flag === f.flag),
+    );
+    if (newCrit.length > 0) {
+      return {
+        direction: "down",
+        headline: "Critical findings introduce scoring uncertainty",
+        reason: `${newCrit.length} new critical finding${newCrit.length > 1 ? "s" : ""} require targeted evidence to resolve before final scoring`,
+      };
+    }
+  }
+
+  // Negative: gaps grew
+  if (prevCov && nextCov && nextCov.gaps_count > prevCov.gaps_count) {
+    const delta = nextCov.gaps_count - prevCov.gaps_count;
+    return {
+      direction: "down",
+      headline: "Evidence coverage gaps identified",
+      reason: `${delta} additional required artifact${delta > 1 ? "s" : ""} not yet provided — scoring relies on incomplete evidence`,
+    };
+  }
+
+  return null;
 }
 
-// ------------------------------------------------------------------
-// Public: diff two KB snapshots and return a structured batch.
-// Returns null when nothing meaningful changed.
-// ------------------------------------------------------------------
+// ─── Primary Insight ─────────────────────────────────────────────────────────
+// Single sentence at the top of the panel. Analyst tone, IC-ready.
 
-export function diffKnowledgeBase(prev: ClientKb, next: ClientKb): SystemSignalBatch | null {
-  const risks: RiskSignal[] = [];
-  const gaps: GapSignal[] = [];
-  const adjustments: ModelAdjustmentSignal[] = [];
+function derivePrimaryInsight(changes: KeyChange[], confidence: ConfidenceShift | null): string {
+  const topCritRisk = changes.find((c) => c.severity === "critical" && c.category === "risk");
+  if (topCritRisk) {
+    return topCritRisk.dimension
+      ? `${DIMENSION_SHORT_LABEL[topCritRisk.dimension]} is the primary risk factor — requires resolution before IC submission`
+      : "Critical risk identified — requires resolution before IC submission";
+  }
 
-  // Intake
+  const critGap = changes.find((c) => c.severity === "critical" && c.category === "gap");
+  if (critGap) return "Artifact collection is the primary gating factor for decision readiness";
+
+  const scoreImpact = changes.find((c) => c.category === "score_impact");
+  if (scoreImpact) return scoreImpact.headline;
+
+  if (confidence?.direction === "down") {
+    return "Missing evidence is limiting scoring confidence — prioritise artifact collection";
+  }
+  if (confidence?.direction === "up") {
+    return "Evidence base is strengthening — diligence is converging toward decision readiness";
+  }
+
+  const top = changes[0];
+  return top ? top.headline : "";
+}
+
+// ─── Main export ─────────────────────────────────────────────────────────────
+
+const CRITICAL_CAP  = 3;
+const IMPORTANT_CAP = 3;
+
+export function buildKeyChangesBatch(prev: ClientKb, next: ClientKb): KeyChangesBatch | null {
+  const raw: KeyChange[] = [];
+
   const prevIntake = prev.intake?.payload.kind === "intake" ? prev.intake.payload : undefined;
   const nextIntake = next.intake?.payload.kind === "intake" ? next.intake.payload : undefined;
   if (nextIntake) {
-    risks.push(...intakeRiskDiff(prevIntake, nextIntake));
-    adjustments.push(...engagementTypeAdjustments(prevIntake?.engagement_type, nextIntake.engagement_type));
-    adjustments.push(...buyerArchetypeAdjustments(prevIntake?.buyer_archetype, nextIntake.buyer_archetype));
-    adjustments.push(...diligencePriorityAdjustments(prevIntake?.diligence_priorities, nextIntake.diligence_priorities));
+    raw.push(...deriveIntakeRisks(prevIntake, nextIntake));
+    raw.push(...deriveScoreImpacts(prevIntake, nextIntake));
   }
 
-  // Pre-analysis
   const prevPa = prev.pre_analysis?.payload.kind === "pre_analysis" ? prev.pre_analysis.payload : undefined;
   const nextPa = next.pre_analysis?.payload.kind === "pre_analysis" ? next.pre_analysis.payload : undefined;
-  if (nextPa) risks.push(...preAnalysisRiskDiff(prevPa, nextPa));
+  if (nextPa) raw.push(...derivePreAnalysisRisks(prevPa, nextPa));
 
-  // Coverage
   const prevCov = prev.coverage?.payload.kind === "coverage" ? prev.coverage.payload : undefined;
   const nextCov = next.coverage?.payload.kind === "coverage" ? next.coverage.payload : undefined;
-  if (nextCov) gaps.push(...coverageGapDiff(prevCov, nextCov));
+  if (nextCov) raw.push(...deriveCoverageChanges(prevCov, nextCov));
 
-  // Knowledge base growth
-  const knowledge = knowledgeDelta(prev, next);
+  const confidenceShift = deriveConfidenceShift(prev, next);
 
-  // De-dupe adjustments: keep strongest (first-seen) per dimension+direction.
-  const seen = new Set<string>();
-  const dedupedAdjustments = adjustments.filter((a) => {
-    const k = `${a.dimension}:${a.direction}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
+  // Materiality filter: must have at least one risk, gap, or score impact
+  if (raw.length === 0 && !confidenceShift) return null;
 
-  if (
-    risks.length === 0 &&
-    gaps.length === 0 &&
-    dedupedAdjustments.length === 0 &&
-    knowledge.length === 0
-  ) {
-    return null;
-  }
+  // Sort by priority ascending, then by severity (critical first)
+  const severityRank: Record<KeyChangeSeverity, number> = { critical: 0, important: 1 };
+  raw.sort((a, b) => a.priority - b.priority || severityRank[a.severity] - severityRank[b.severity]);
 
-  // Sort risks by severity (critical → high → medium)
-  const severityRank = { critical: 0, high: 1, medium: 2 } as const;
-  risks.sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
+  // Assign display priority positions (1-based)
+  raw.forEach((c, i) => { c.priority = i + 1; });
+
+  // Determine "hasMore" based on caps
+  const totalCritical  = raw.filter((c) => c.severity === "critical").length;
+  const totalImportant = raw.filter((c) => c.severity === "important").length;
+  const hasMore = totalCritical > CRITICAL_CAP || totalImportant > IMPORTANT_CAP;
+
+  const primaryInsight = derivePrimaryInsight(raw, confidenceShift);
 
   return {
-    id: `sig-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    id: `batch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
     created_at: new Date().toISOString(),
-    risks,
-    gaps,
-    adjustments: dedupedAdjustments,
-    knowledge,
+    primaryInsight,
+    changes: raw,
+    confidenceShift,
+    hasMore,
   };
 }
 
-// ------------------------------------------------------------------
-// Compact headline — max 60 chars. Max 3 categories: Risks, Gaps, Model.
-// ------------------------------------------------------------------
-
-export function formatHeadline(batch: SystemSignalBatch): string {
+/** Pill headline — counts only, no internal mechanics */
+export function formatPillHeadline(batch: KeyChangesBatch): string {
+  const nCrit = batch.changes.filter((c) => c.severity === "critical").length;
+  const nImp  = batch.changes.filter((c) => c.severity === "important").length;
   const parts: string[] = [];
-  if (batch.risks.length > 0) parts.push(`+${batch.risks.length} Risk${batch.risks.length === 1 ? "" : "s"}`);
-  if (batch.gaps.length > 0) parts.push(`+${batch.gaps.length} Gap${batch.gaps.length === 1 ? "" : "s"}`);
-  if (batch.adjustments.length > 0) parts.push("Model Updated");
-  // If no risks/gaps/model but knowledge grew, surface that instead.
-  if (parts.length === 0 && batch.knowledge.length > 0) {
-    const total = batch.knowledge.reduce((s, k) => s + k.count, 0);
-    parts.push(`+${total} Signal${total === 1 ? "" : "s"}`);
-  }
-  const headline = parts.slice(0, 3).join(" • ");
-  return headline.length > 60 ? headline.slice(0, 59) + "…" : headline;
+  if (nCrit > 0) parts.push(`${nCrit} Critical`);
+  if (nImp  > 0) parts.push(`${nImp} Important`);
+  if (parts.length === 0 && batch.confidenceShift) parts.push("Confidence Shift");
+  return parts.join(" · ");
 }
+
+//
+// Derives auditable, dimension-anchored "what just changed in the
+// model" events from diffs of the preview knowledge base. Every
+// signal maps back to one of the 6 scoring dimensions, a specific
+// sub-criterion, or a named artifact requirement. No generic phrases.
+//
+// Consumer: src/hooks/use-system-signals.ts
+//           src/components/preview/system-signal-pill.tsx

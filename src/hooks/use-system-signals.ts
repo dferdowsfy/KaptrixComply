@@ -6,65 +6,119 @@ import {
   subscribeKnowledgeBase,
 } from "@/lib/preview/knowledge-base";
 import {
-  diffKnowledgeBase,
+  buildKeyChangesBatch,
   type ClientKb,
-  type SystemSignalBatch,
+  type KeyChange,
+  type KeyChangesBatch,
 } from "@/lib/preview/system-signals";
 
 const EMPTY_KB: ClientKb = {};
-const MAX_HISTORY = 20;
-const PILL_AUTO_DISMISS_MS = 4500;
+const MAX_HISTORY        = 10;
+/** Wait for inactivity before emitting — prevents per-keystroke updates */
+const DEBOUNCE_MS        = 2500;
+/** Auto-dismiss the pill after this duration */
+const PILL_DISMISS_MS    = 6000;
 
 export interface UseSystemSignalsResult {
-  /** Most recent batch; null when nothing is being shown right now. */
-  current: SystemSignalBatch | null;
-  /** Rolling history (most recent first). */
-  history: SystemSignalBatch[];
-  /** Manually dismiss the pill. */
+  /** Currently visible batch — null when dismissed */
+  current: KeyChangesBatch | null;
+  /** Rolling session history (most recent first) */
+  history: KeyChangesBatch[];
   dismiss: () => void;
-  /** Clear full history (panel action). */
   clearHistory: () => void;
 }
 
 /**
- * Watches the preview knowledge base for the active client and emits
- * structured "system signal" batches whenever real changes land.
+ * Watches the preview KB for the active client.
  *
- * No batch is emitted on first mount — we seed the baseline from the
- * current KB so operators don't see a phantom "Model Updated" flash
- * just for opening a page.
+ * - Seeds baseline from current KB on first mount → no phantom flash on page load.
+ * - Debounces KB changes by DEBOUNCE_MS so rapid input sequences produce a
+ *   single insight batch, not per-field noise.
+ * - Applies in-session dedup: suppresses re-surfacing the same fingerprint
+ *   unless its severity escalated (lifecycle = "updated").
  */
 export function useSystemSignals(clientId: string | null | undefined): UseSystemSignalsResult {
-  const [current, setCurrent] = useState<SystemSignalBatch | null>(null);
-  const [history, setHistory] = useState<SystemSignalBatch[]>([]);
-  const prevKbRef = useRef<ClientKb>(EMPTY_KB);
-  const prevClientIdRef = useRef<string | null | undefined>(undefined);
-  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [current, setCurrent] = useState<KeyChangesBatch | null>(null);
+  const [history, setHistory] = useState<KeyChangesBatch[]>([]);
+
+  /** KB snapshot at the time of the last emitted batch */
+  const lastEmittedKbRef   = useRef<ClientKb>(EMPTY_KB);
+  /** Latest received KB snapshot (may be ahead of lastEmitted) */
+  const pendingKbRef       = useRef<ClientKb>(EMPTY_KB);
+  const prevClientIdRef    = useRef<string | null | undefined>(undefined);
+  const debounceTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * In-session dedup store: fingerprint → { severity, headline }
+   * A change is suppressed if the same fingerprint was already shown
+   * with the same (or higher) severity. Re-surfaces as "updated" if severity escalated.
+   */
+  const seenRef = useRef<Map<string, { severity: string; headline: string }>>(new Map());
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // On client-id change, reset baseline and clear visible pill.
+    // Reset on client change
     if (prevClientIdRef.current !== clientId) {
       prevClientIdRef.current = clientId;
-      prevKbRef.current = clientId ? readClientKb(clientId) : EMPTY_KB;
+      const kb = clientId ? readClientKb(clientId) : EMPTY_KB;
+      lastEmittedKbRef.current = kb;
+      pendingKbRef.current     = kb;
+      seenRef.current.clear();
       setCurrent(null);
       setHistory([]);
-      if (dismissTimerRef.current) {
-        clearTimeout(dismissTimerRef.current);
-        dismissTimerRef.current = null;
-      }
+      if (debounceTimerRef.current) { clearTimeout(debounceTimerRef.current); debounceTimerRef.current = null; }
+      if (dismissTimerRef.current)  { clearTimeout(dismissTimerRef.current);  dismissTimerRef.current  = null; }
     }
 
     if (!clientId) return;
 
-    const handle = () => {
-      const next = readClientKb(clientId);
-      const prev = prevKbRef.current;
+    const severityRank: Record<string, number> = { critical: 2, important: 1 };
+
+    const processPending = () => {
+      const next = pendingKbRef.current;
+      const prev = lastEmittedKbRef.current;
       if (next === prev) return;
-      const batch = diffKnowledgeBase(prev, next);
-      prevKbRef.current = next;
-      if (!batch) return;
+
+      const raw = buildKeyChangesBatch(prev, next);
+      lastEmittedKbRef.current = next;
+      if (!raw) return;
+
+      // Apply in-session dedup — filter/tag changes
+      const deduped: KeyChange[] = [];
+      for (const change of raw.changes) {
+        const prior = seenRef.current.get(change.id);
+        if (!prior) {
+          // Never seen — surface as "new"
+          deduped.push({ ...change, lifecycle: "new" });
+          seenRef.current.set(change.id, { severity: change.severity, headline: change.headline });
+        } else {
+          const priorRank   = severityRank[prior.severity]   ?? 0;
+          const currentRank = severityRank[change.severity]  ?? 0;
+          if (currentRank > priorRank) {
+            // Severity escalated — surface as "updated"
+            deduped.push({ ...change, lifecycle: "updated" });
+            seenRef.current.set(change.id, { severity: change.severity, headline: change.headline });
+          }
+          // Otherwise: same or lower severity → suppress (already seen)
+        }
+      }
+
+      // Always surface resolved gaps (they're intentionally one-time events)
+      const resolved = raw.changes.filter((c) => c.lifecycle === "resolved");
+      for (const r of resolved) {
+        if (!deduped.some((d) => d.id === r.id)) deduped.push(r);
+      }
+
+      // If nothing new after dedup, still update confidence shift if present
+      if (deduped.length === 0 && !raw.confidenceShift) return;
+
+      const batch: KeyChangesBatch = {
+        ...raw,
+        changes: deduped,
+        hasMore: deduped.filter((c) => c.severity === "critical").length > 3
+               || deduped.filter((c) => c.severity === "important").length > 3,
+      };
 
       setCurrent(batch);
       setHistory((h) => [batch, ...h].slice(0, MAX_HISTORY));
@@ -73,34 +127,36 @@ export function useSystemSignals(clientId: string | null | undefined): UseSystem
       dismissTimerRef.current = setTimeout(() => {
         setCurrent(null);
         dismissTimerRef.current = null;
-      }, PILL_AUTO_DISMISS_MS);
+      }, PILL_DISMISS_MS);
+    };
+
+    const handle = () => {
+      pendingKbRef.current = readClientKb(clientId);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null;
+        processPending();
+      }, DEBOUNCE_MS);
     };
 
     const unsubscribe = subscribeKnowledgeBase(handle);
     return () => {
       unsubscribe();
+      if (debounceTimerRef.current) { clearTimeout(debounceTimerRef.current); debounceTimerRef.current = null; }
     };
   }, [clientId]);
 
   useEffect(() => {
-    return () => {
-      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-    };
+    return () => { if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current); };
   }, []);
 
   return {
     current,
     history,
     dismiss: () => {
-      if (dismissTimerRef.current) {
-        clearTimeout(dismissTimerRef.current);
-        dismissTimerRef.current = null;
-      }
+      if (dismissTimerRef.current) { clearTimeout(dismissTimerRef.current); dismissTimerRef.current = null; }
       setCurrent(null);
     },
-    clearHistory: () => {
-      setHistory([]);
-      setCurrent(null);
-    },
+    clearHistory: () => { setHistory([]); setCurrent(null); },
   };
 }
