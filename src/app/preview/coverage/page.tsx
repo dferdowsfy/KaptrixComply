@@ -31,7 +31,7 @@ function uploadedToDocument(
   const parseStatus: ParseStatus =
     d.parse_status === "uploading" || d.parse_status === "queued"
       ? "queued"
-      : d.parse_status === "parsing"
+      : d.parse_status === "parsing" || d.parse_status === "extracting"
         ? "parsing"
         : d.parse_status === "parsed"
           ? "parsed"

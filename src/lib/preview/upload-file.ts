@@ -81,18 +81,23 @@ export function uploadAndParse(file: File, meta: UploadedDoc): Promise<void> {
           });
           return resolve();
         }
+        // Parse succeeded. We now enter the "extracting" phase where the
+        // LLM reads the parsed text and surfaces KnowledgeInsights. The
+        // document is not considered fully ingested ("parsed") until this
+        // completes, so the coverage matrix keeps showing progress rather
+        // than flipping to ✓ instantly.
+        const parsedText = (parsed.text ?? "").trim();
+        const hasClient = Boolean(meta.client_id && parsedText);
+
         upsertUploadedDoc({
           ...meta,
-          parse_status: "parsed",
-          parsed_text: (parsed.text ?? "").trim(),
+          parse_status: hasClient ? "extracting" : "parsed",
+          parsed_text: parsedText,
           token_count: parsed.tokenCount,
           upload_percent: 100,
         });
 
-        // Background: run LLM insight extraction on the parsed text.
-        // Fire-and-forget — never blocks the upload completion.
-        const parsedText = (parsed.text ?? "").trim();
-        if (parsedText && meta.client_id) {
+        if (hasClient) {
           const clientId = meta.client_id;
           void fetch("/api/preview/extract-insights", {
             method: "POST",
@@ -104,16 +109,36 @@ export function uploadAndParse(file: File, meta: UploadedDoc): Promise<void> {
             }),
           })
             .then(async (res) => {
-              if (!res.ok) return;
-              const data = (await res.json()) as {
-                insights?: import("@/components/documents/knowledge-insights-panel").KnowledgeInsight[];
-              };
-              if (Array.isArray(data.insights) && data.insights.length > 0) {
-                mergeExtractedInsights(clientId, data.insights);
+              let insightsCount = 0;
+              if (res.ok) {
+                const data = (await res.json()) as {
+                  insights?: import("@/components/documents/knowledge-insights-panel").KnowledgeInsight[];
+                };
+                if (Array.isArray(data.insights) && data.insights.length > 0) {
+                  mergeExtractedInsights(clientId, data.insights);
+                  insightsCount = data.insights.length;
+                }
               }
+              upsertUploadedDoc({
+                ...meta,
+                parse_status: "parsed",
+                parsed_text: parsedText,
+                token_count: parsed.tokenCount,
+                upload_percent: 100,
+                insights_count: insightsCount,
+              });
             })
             .catch(() => {
-              // Extraction is best-effort; silently ignore errors.
+              // Extraction failed — still mark as parsed so the file is
+              // usable, but leave insights_count at 0.
+              upsertUploadedDoc({
+                ...meta,
+                parse_status: "parsed",
+                parsed_text: parsedText,
+                token_count: parsed.tokenCount,
+                upload_percent: 100,
+                insights_count: 0,
+              });
             });
         }
       } finally {

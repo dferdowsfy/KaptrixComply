@@ -19,6 +19,15 @@ import {
   type KnowledgeEntry,
   type KnowledgeStep,
 } from "@/lib/preview/knowledge-base";
+import {
+  formatUploadedDocsEvidence,
+  readUploadedDocs,
+  subscribeUploadedDocs,
+} from "@/lib/preview/uploaded-docs";
+import {
+  readExtractedInsights,
+  subscribeExtractedInsights,
+} from "@/lib/preview/extracted-insights";
 import { deriveContextSignals } from "@/lib/scoring/context";
 import { startScoreRun, useScoreRunStore } from "@/lib/scoring/score-run-store";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
@@ -31,6 +40,10 @@ const SCORE_CACHE_PREFIX = "kaptrix.preview.scoring.v1:";
 type ScoreCache = {
   scores: Score[];
   generated_at: string;
+  /** Signature of the inputs that produced this cache — if these
+   *  change the operator sees an "inputs changed" banner prompting
+   *  a re-run so scores stay aligned with the current evidence. */
+  inputs_signature?: string;
 };
 
 function readScoreCache(clientId: string | null | undefined): ScoreCache | null {
@@ -101,6 +114,23 @@ export default function PreviewScoringPage() {
     () => EMPTY_KB,
   );
 
+  // Also subscribe to uploaded docs + extracted insights so the scoring
+  // prompt reflects the full operator context — not just the structured
+  // KB payloads. This is the normalisation layer: every signal the
+  // operator has produced (intake, coverage status, uploaded PDFs/PPTX
+  // text, LLM-extracted insights) is compacted into one knowledge_base
+  // string before we call the scoring LLM.
+  const uploadedDocs = useSyncExternalStore(
+    subscribeUploadedDocs,
+    () => readUploadedDocs(selectedId),
+    () => [] as readonly import("@/lib/preview/uploaded-docs").UploadedDoc[],
+  );
+  const extractedInsights = useSyncExternalStore(
+    subscribeExtractedInsights,
+    () => readExtractedInsights(selectedId),
+    () => [] as import("@/components/documents/knowledge-insights-panel").KnowledgeInsight[],
+  );
+
   const contextSignals = deriveContextSignals(currentContextSlice(kb, "scoring"));
   const submittedSteps = (Object.keys(kb) as KnowledgeStep[]).filter((k) => kb[k]);
   const missingSteps = (
@@ -116,17 +146,59 @@ export default function PreviewScoringPage() {
   const loading = isMyRun && scoreRun.status === "running";
   const storeError = isMyRun && scoreRun.status === "error" ? (scoreRun.error ?? "Score generation failed.") : null;
 
+  // Signature of the inputs that would be sent to the scoring LLM. When
+  // this changes (new upload, removed file, new insight) we show an
+  // "inputs changed — re-run scoring" banner so the operator knows their
+  // scores no longer reflect the full evidence set.
+  const currentInputsSignature = useMemo(() => {
+    const docSig = uploadedDocs
+      .filter((d) => d.parse_status === "parsed")
+      .map((d) => d.id)
+      .sort()
+      .join(",");
+    const insightSig = extractedInsights
+      .map((i) => i.id)
+      .sort()
+      .join(",");
+    const kbStepCount = Object.keys(kb).length;
+    return `docs:${docSig}|ins:${insightSig}|kb:${kbStepCount}`;
+  }, [uploadedDocs, extractedInsights, kb]);
+
+  const inputsChanged =
+    suggestedScores !== null &&
+    scoreCache?.inputs_signature !== undefined &&
+    scoreCache.inputs_signature !== currentInputsSignature;
+
   const run = useCallback(() => {
     if (!selectedId) return;
+    // Compose the full scoring context: structured KB payloads +
+    // uploaded document text + extracted knowledge insights. This is
+    // the normalisation layer — every signal the operator has produced
+    // flows into the scoring prompt.
     const slice = currentContextSlice(kb, "scoring");
-    const knowledge_base = formatKnowledgeBaseEvidence(slice).join("\n");
+    const kbLines = formatKnowledgeBaseEvidence(slice);
+    const docLines = formatUploadedDocsEvidence(selectedId, 8_000);
+    const insightLines = extractedInsights.map(
+      (i) =>
+        `[extracted-insight · ${i.category} · ${i.confidence}] ${i.insight} (source: ${i.source_document})`,
+    );
+    const parts: string[] = [];
+    if (kbLines.length > 0) {
+      parts.push("## Knowledge base", ...kbLines);
+    }
+    if (docLines.length > 0) {
+      parts.push("", "## Uploaded documents", ...docLines);
+    }
+    if (insightLines.length > 0) {
+      parts.push("", "## Extracted insights", ...insightLines);
+    }
+    const knowledge_base = parts.join("\n");
     if (!knowledge_base.trim()) {
-      // Not enough context — handled via storeError display below.
       startScoreRun(selectedId, "");
       return;
     }
     startScoreRun(selectedId, knowledge_base);
-  }, [selectedId, kb]);
+  }, [selectedId, kb, extractedInsights]);
 
   // React when the global store completes for our client.
   useEffect(() => {
@@ -140,7 +212,11 @@ export default function PreviewScoringPage() {
       const ts = scoreRun.generated_at ?? new Date().toISOString();
       setLiveScores(scores);
       setLiveGeneratedAt(ts);
-      writeScoreCache(selectedId, { scores, generated_at: ts });
+      writeScoreCache(selectedId, {
+        scores,
+        generated_at: ts,
+        inputs_signature: currentInputsSignature,
+      });
       // Write to KB with stale cleared (explicit operator re-run).
       submitScoringToKnowledgeBase({
         clientId: selectedId,
@@ -151,13 +227,14 @@ export default function PreviewScoringPage() {
         autoSync: false,
       });
     }
-  }, [scoreRun.status, scoreRun.clientId, scoreRun.scores, scoreRun.generated_at, selectedId, engagement.id]);
+  }, [scoreRun.status, scoreRun.clientId, scoreRun.scores, scoreRun.generated_at, selectedId, engagement.id, currentInputsSignature]);
 
   // (cache restore is now handled synchronously via useMemo above)
 
   // The scores passed to the panel: LLM suggestions if available, otherwise snapshot.
   const panelScores = suggestedScores ?? (snapshot?.scores ?? []);
-  const upstreamChanged = scoringDirty.dirty && suggestedScores !== null;
+  const upstreamChanged =
+    (scoringDirty.dirty && suggestedScores !== null) || inputsChanged;
 
   return (
     <div className="space-y-4">
@@ -183,9 +260,11 @@ export default function PreviewScoringPage() {
         {(upstreamChanged || staleUpstream.length > 0) && (
           <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
             <span className="font-semibold">Upstream context changed.</span>{" "}
-            {upstreamChanged
-              ? `${scoringDirty.reasons.map((r) => KNOWLEDGE_STEP_LABELS[r]).join(", ")} updated — click Re-run scoring to regenerate.`
-              : `Re-submit ${staleUpstream.map((r) => KNOWLEDGE_STEP_LABELS[r]).join(", ")} to clear the stale flag.`}
+            {inputsChanged
+              ? "New evidence (uploaded documents or extracted insights) has been added since scores were generated — click Re-run scoring to incorporate it."
+              : upstreamChanged
+                ? `${scoringDirty.reasons.map((r) => KNOWLEDGE_STEP_LABELS[r]).join(", ")} updated — click Re-run scoring to regenerate.`
+                : `Re-submit ${staleUpstream.map((r) => KNOWLEDGE_STEP_LABELS[r]).join(", ")} to clear the stale flag.`}
           </div>
         )}
         <div className="mt-2 flex flex-wrap gap-2">

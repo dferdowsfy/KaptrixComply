@@ -361,6 +361,7 @@ export function IndustryCoverageMatrix({
                 (u) =>
                   u.parse_status === "uploading" ||
                   u.parse_status === "parsing" ||
+                  u.parse_status === "extracting" ||
                   u.parse_status === "queued",
               );
               return (
@@ -549,14 +550,14 @@ function RowUploads({
   clientId?: string | null;
 }) {
   if (uploads.length === 0) return null;
-  // Compact variant shows in-flight + parsed files so users see both
-  // the progress state and the green ✓ confirmation after a successful
-  // upload. Previously-failed files are also shown so they can be removed.
+  // Compact mode keeps everything visible so users see the ✓ confirmation
+  // and can remove files after a successful upload.
   const visible = compact
     ? uploads.filter(
         (d) =>
           d.parse_status === "uploading" ||
           d.parse_status === "parsing" ||
+          d.parse_status === "extracting" ||
           d.parse_status === "queued" ||
           d.parse_status === "parsed" ||
           d.parse_status === "failed",
@@ -564,38 +565,53 @@ function RowUploads({
     : uploads;
   if (visible.length === 0) return null;
   return (
-    <ul className={compact ? "space-y-1" : "mt-2 space-y-1.5"}>
+    <ul className={compact ? "space-y-1.5" : "mt-2 space-y-2"}>
       {visible.map((d) => (
-        <li key={d.id} className="max-w-xs">
-          <div className="flex items-center justify-between gap-2">
+        <li key={d.id}>
+          <div className="flex items-center justify-between gap-2 rounded-md border border-slate-100 bg-white/60 px-2 py-1.5">
             <span
-              className="min-w-0 truncate text-[11px] font-medium text-slate-700"
+              className="min-w-0 flex-1 truncate text-[12px] font-medium text-slate-700"
               title={d.filename}
             >
               {d.filename}
             </span>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 items-center gap-2">
               {d.parse_status === "uploading" ? (
-                <span className="tabular-nums text-[10px] font-semibold text-sky-700">
+                <span className="tabular-nums text-[11px] font-semibold text-sky-700">
                   {Math.max(0, Math.min(100, d.upload_percent ?? 0))}%
                 </span>
               ) : d.parse_status === "parsing" ? (
-                <span className="text-[10px] font-semibold text-amber-700">
+                <span className="text-[11px] font-semibold text-amber-700">
                   Parsing…
                 </span>
+              ) : d.parse_status === "extracting" ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-violet-500" />
+                  Analysing…
+                </span>
               ) : d.parse_status === "parsed" ? (
-                <span className="text-[10px] font-semibold text-emerald-700">
-                  ✓
+                <span
+                  className="text-[11px] font-semibold text-emerald-700"
+                  title={
+                    typeof d.insights_count === "number"
+                      ? `${d.insights_count} insight${d.insights_count === 1 ? "" : "s"} extracted`
+                      : "Parsed"
+                  }
+                >
+                  ✓ Ready
+                  {typeof d.insights_count === "number" && d.insights_count > 0
+                    ? ` · ${d.insights_count} insight${d.insights_count === 1 ? "" : "s"}`
+                    : ""}
                 </span>
               ) : d.parse_status === "failed" ? (
                 <span
-                  className="text-[10px] font-semibold text-rose-700"
+                  className="text-[11px] font-semibold text-rose-700"
                   title={d.error ?? "Failed"}
                 >
                   Failed
                 </span>
               ) : (
-                <span className="text-[10px] font-semibold text-slate-500">
+                <span className="text-[11px] font-semibold text-slate-500">
                   Queued
                 </span>
               )}
@@ -608,19 +624,31 @@ function RowUploads({
                     e.stopPropagation();
                     removeUploadedDoc(clientId, d.id);
                   }}
-                  className="rounded px-0.5 text-[11px] leading-none text-slate-300 transition hover:text-rose-500"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
                 >
-                  ✕
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-3.5 w-3.5"
+                  >
+                    <path d="M7.5 3a1 1 0 0 0-1 1v1H4a1 1 0 1 0 0 2h.3l.7 9.3A2 2 0 0 0 7 18h6a2 2 0 0 0 2-1.7l.7-9.3H16a1 1 0 1 0 0-2h-2.5V4a1 1 0 0 0-1-1h-5zm1 2V4h3v1h-3zM7 8a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V9a1 1 0 0 1 1-1zm3 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V9a1 1 0 0 1 1-1zm3 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V9a1 1 0 0 1 1-1z" />
+                  </svg>
                 </button>
               )}
             </div>
           </div>
           {(d.parse_status === "uploading" ||
             d.parse_status === "parsing" ||
+            d.parse_status === "extracting" ||
             d.parse_status === "queued") && (
             <div
-              className={`mt-0.5 h-1 w-full overflow-hidden rounded-full ${
-                d.parse_status === "uploading" ? "bg-sky-100" : "bg-amber-100"
+              className={`mt-1 h-1 w-full overflow-hidden rounded-full ${
+                d.parse_status === "uploading"
+                  ? "bg-sky-100"
+                  : d.parse_status === "extracting"
+                    ? "bg-violet-100"
+                    : "bg-amber-100"
               }`}
             >
               {d.parse_status === "uploading" ? (
@@ -630,6 +658,8 @@ function RowUploads({
                     width: `${Math.max(2, Math.min(100, d.upload_percent ?? 0))}%`,
                   }}
                 />
+              ) : d.parse_status === "extracting" ? (
+                <div className="h-full w-full animate-pulse rounded-full bg-violet-500" />
               ) : (
                 <div className="h-full w-full animate-pulse rounded-full bg-amber-500" />
               )}

@@ -12,6 +12,7 @@ export type UploadedDocStatus =
   | "queued"
   | "uploading"
   | "parsing"
+  | "extracting"
   | "parsed"
   | "failed";
 
@@ -32,6 +33,8 @@ export interface UploadedDoc {
   token_count?: number;
   /** Failure reason if parse_status === "failed". */
   error?: string;
+  /** Number of KnowledgeInsights extracted from this doc (set once extraction completes). */
+  insights_count?: number;
 }
 
 type Store = Record<string, UploadedDoc[]>;
