@@ -3,12 +3,23 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PREVIEW_TABS } from "@/lib/preview-tabs";
-import { ALL_TIERS, TIERS, type Tier, resolveLimits } from "@/lib/plans";
+import {
+  ALL_TIERS,
+  TIERS,
+  type Tier,
+  resolveLimits,
+  ALL_REPORT_KINDS,
+  REPORT_KIND_LABEL,
+  reportKindCap,
+  type ReportKind,
+} from "@/lib/plans";
 
 interface TierOverrides {
   max_engagements?: number;
   max_reports_per_month?: number;
   max_ai_queries_per_month?: number;
+  reports_enabled?: ReportKind[];
+  per_report_caps?: Partial<Record<ReportKind, number>>;
   benchmarking_enabled?: boolean;
   advanced_reports_enabled?: boolean;
   priority_processing?: boolean;
@@ -544,6 +555,19 @@ function LimitsEditor({
   const [ai, setAi] = useState<string>(
     String(user.tier_overrides?.max_ai_queries_per_month ?? ""),
   );
+  const [reportsEnabled, setReportsEnabled] = useState<ReportKind[]>(
+    user.tier_overrides?.reports_enabled ?? effective.reports_enabled,
+  );
+  const [perReportCaps, setPerReportCaps] = useState<Record<ReportKind, string>>(
+    () => {
+      const out = {} as Record<ReportKind, string>;
+      for (const k of ALL_REPORT_KINDS) {
+        const ov = user.tier_overrides?.per_report_caps?.[k];
+        out[k] = typeof ov === "number" ? String(ov) : "";
+      }
+      return out;
+    },
+  );
 
   function summary(limit: number): string {
     return limit < 0 ? "Unlimited" : String(limit);
@@ -554,6 +578,18 @@ function LimitsEditor({
     if (eng.trim() !== "") next.max_engagements = Number(eng);
     if (reps.trim() !== "") next.max_reports_per_month = Number(reps);
     if (ai.trim() !== "") next.max_ai_queries_per_month = Number(ai);
+    // Only persist reports_enabled if it differs from the tier default.
+    const baseEnabled = TIERS[user.tier].limits.reports_enabled;
+    const sameAsBase =
+      reportsEnabled.length === baseEnabled.length &&
+      reportsEnabled.every((k) => baseEnabled.includes(k));
+    if (!sameAsBase) next.reports_enabled = reportsEnabled;
+    const caps: Partial<Record<ReportKind, number>> = {};
+    for (const k of ALL_REPORT_KINDS) {
+      const v = perReportCaps[k];
+      if (v.trim() !== "" && Number.isFinite(Number(v))) caps[k] = Number(v);
+    }
+    if (Object.keys(caps).length > 0) next.per_report_caps = caps;
     onSave(Object.keys(next).length ? next : null);
     setOpen(false);
   }
@@ -562,8 +598,18 @@ function LimitsEditor({
     setEng("");
     setReps("");
     setAi("");
+    setReportsEnabled(TIERS[user.tier].limits.reports_enabled);
+    const cleared = {} as Record<ReportKind, string>;
+    for (const k of ALL_REPORT_KINDS) cleared[k] = "";
+    setPerReportCaps(cleared);
     onSave(null);
     setOpen(false);
+  }
+
+  function toggleReport(kind: ReportKind) {
+    setReportsEnabled((prev) =>
+      prev.includes(kind) ? prev.filter((k) => k !== kind) : [...prev, kind],
+    );
   }
 
   return (
@@ -572,6 +618,10 @@ function LimitsEditor({
         <div>Engagements: {summary(effective.max_engagements)}</div>
         <div>Reports/mo: {summary(effective.max_reports_per_month)}</div>
         <div>AI queries/mo: {summary(effective.max_ai_queries_per_month)}</div>
+        <div className="pt-0.5 text-[10px] text-slate-500">
+          {effective.reports_enabled.length}/{ALL_REPORT_KINDS.length} report
+          types enabled
+        </div>
       </div>
       {!open ? (
         <button
@@ -583,7 +633,7 @@ function LimitsEditor({
           {user.tier_overrides ? "Edit override" : "Override"}
         </button>
       ) : (
-        <div className="mt-1 space-y-1 rounded-md border border-indigo-200 bg-indigo-50/60 p-2">
+        <div className="mt-1 space-y-2 rounded-md border border-indigo-200 bg-indigo-50/60 p-2">
           <label className="block text-[10px] font-medium text-slate-700">
             Engagements (−1 = unlimited)
             <input
@@ -594,7 +644,7 @@ function LimitsEditor({
             />
           </label>
           <label className="block text-[10px] font-medium text-slate-700">
-            Reports / month
+            Reports / month (aggregate)
             <input
               value={reps}
               onChange={(e) => setReps(e.target.value)}
@@ -611,6 +661,49 @@ function LimitsEditor({
               className="mt-0.5 block w-full rounded border border-slate-300 px-1.5 py-0.5 text-xs"
             />
           </label>
+
+          <div className="border-t border-indigo-100 pt-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-700">
+              Reports enabled & monthly cap
+            </p>
+            <div className="mt-1 space-y-1">
+              {ALL_REPORT_KINDS.map((kind) => {
+                const enabled = reportsEnabled.includes(kind);
+                const effectiveCap = reportKindCap(effective, kind);
+                return (
+                  <div
+                    key={kind}
+                    className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-1.5 py-1"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={() => toggleReport(kind)}
+                      className="h-3 w-3"
+                    />
+                    <span className="flex-1 text-[10px] text-slate-700">
+                      {REPORT_KIND_LABEL[kind]}
+                    </span>
+                    <input
+                      value={perReportCaps[kind]}
+                      onChange={(e) =>
+                        setPerReportCaps((p) => ({ ...p, [kind]: e.target.value }))
+                      }
+                      disabled={!enabled}
+                      placeholder={String(effectiveCap)}
+                      inputMode="numeric"
+                      className="w-14 rounded border border-slate-300 px-1 py-0.5 text-[10px] disabled:bg-slate-50"
+                      title="Per-report monthly cap (−1 = unlimited). Blank inherits the aggregate cap."
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-1 text-[9px] text-slate-500">
+              Blank = inherit aggregate. −1 = unlimited.
+            </p>
+          </div>
+
           <div className="flex gap-1 pt-1">
             <button
               type="button"

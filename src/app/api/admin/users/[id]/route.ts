@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, requireAdmin, authErrorResponse } from "@/lib/security/authz";
 import { getServiceClient } from "@/lib/supabase/service";
-import { isValidTier } from "@/lib/plans";
+import { isValidTier, ALL_REPORT_KINDS, type ReportKind } from "@/lib/plans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,10 +21,12 @@ const OVERRIDE_BOOLEAN_KEYS = [
   "team_collaboration",
 ] as const;
 
-function sanitizeOverrides(input: unknown): Record<string, number | boolean> | null {
+function sanitizeOverrides(
+  input: unknown,
+): Record<string, unknown> | null {
   if (!input || typeof input !== "object") return null;
   const src = input as Record<string, unknown>;
-  const out: Record<string, number | boolean> = {};
+  const out: Record<string, unknown> = {};
   for (const key of OVERRIDE_NUMERIC_KEYS) {
     const v = src[key];
     if (typeof v === "number" && Number.isFinite(v)) out[key] = Math.trunc(v);
@@ -32,6 +34,24 @@ function sanitizeOverrides(input: unknown): Record<string, number | boolean> | n
   for (const key of OVERRIDE_BOOLEAN_KEYS) {
     const v = src[key];
     if (typeof v === "boolean") out[key] = v;
+  }
+  if (Array.isArray(src.reports_enabled)) {
+    const filtered = (src.reports_enabled as unknown[]).filter(
+      (k): k is ReportKind =>
+        typeof k === "string" && (ALL_REPORT_KINDS as string[]).includes(k),
+    );
+    out.reports_enabled = filtered;
+  }
+  if (src.per_report_caps && typeof src.per_report_caps === "object") {
+    const capsIn = src.per_report_caps as Record<string, unknown>;
+    const capsOut: Record<string, number> = {};
+    for (const kind of ALL_REPORT_KINDS) {
+      const v = capsIn[kind];
+      if (typeof v === "number" && Number.isFinite(v)) {
+        capsOut[kind] = Math.trunc(v);
+      }
+    }
+    if (Object.keys(capsOut).length > 0) out.per_report_caps = capsOut;
   }
   return Object.keys(out).length > 0 ? out : null;
 }

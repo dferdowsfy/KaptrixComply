@@ -156,10 +156,10 @@ export default function PositioningPage() {
     }
   }, [selectedId, kb]);
 
-  // On client change: restore prior results from cache immediately so the
-  // page never looks empty. Only auto-run the API when we have nothing cached.
-  // Gate on `ready` so we don't run against a placeholder selectedId before
-  // the real one is hydrated from localStorage.
+  // On client change: restore prior results from cache if we have them.
+  // Do NOT auto-run the API — show the placeholder so the user decides when
+  // to spend a compute cycle. Gates on `ready` so we only act after the
+  // persisted selectedId is hydrated from localStorage.
   useEffect(() => {
     if (!ready || !selectedId) return;
     setError(null);
@@ -173,7 +173,6 @@ export default function PositioningPage() {
     setData(null);
     setSources([]);
     setGeneratedAt(null);
-    run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, ready]);
 
@@ -219,6 +218,8 @@ export default function PositioningPage() {
       )}
 
       {loading && !data && <SkeletonPositioning />}
+
+      {!loading && !data && !error && <EmptyPositioning client={client} />}
 
       {data && (
         <>
@@ -421,6 +422,78 @@ function SkeletonPositioning() {
       <div className="h-24 animate-pulse rounded-2xl bg-slate-100" />
       <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />
       <div className="h-48 animate-pulse rounded-2xl bg-slate-100" />
+    </div>
+  );
+}
+
+// Rich placeholder shown before any analysis has been run for this client.
+// Keeps the page from looking broken / empty and orients the user on what
+// this module will produce.
+function EmptyPositioning({
+  client,
+}: {
+  client: { target: string; industry: string; deal_stage: string; client: string };
+}) {
+  return (
+    <div className="space-y-4">
+      {/* What you'll see */}
+      <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+          Ready when you are
+        </p>
+        <h3 className="mt-1 text-base font-semibold text-slate-900">
+          Position {client.target} against contextually relevant peers
+        </h3>
+        <p className="mt-1 max-w-2xl text-sm text-slate-600">
+          Kaptrix pulls comparables from live web research, then maps{" "}
+          {client.target} against them on the dimensions that drive IC conviction.
+          Click <span className="font-semibold text-slate-900">Run analysis</span>{" "}
+          above to generate a fresh read.
+        </p>
+      </div>
+
+      {/* Preview of what the module produces */}
+      <div className="grid gap-3 md:grid-cols-3">
+        <PreviewCard
+          title="Target context"
+          body="The product, industry, customer segment, data sensitivity and architecture pattern Kaptrix uses to select peers."
+        />
+        <PreviewCard
+          title="Selected comparables"
+          body="Named companies, products, or analogs surfaced via live web research — each with a rationale and a source link."
+        />
+        <PreviewCard
+          title="Dimension-by-dimension read"
+          body="Ahead · In line · Behind per dimension, each backed by a cited evidence snippet."
+        />
+        <PreviewCard
+          title="Positioning summary"
+          body="A single-sentence IC-ready summary of where the target stands relative to the comparable set."
+        />
+        <PreviewCard
+          title="Investment interpretation"
+          body="Differentiation, durability, risk concentration, and validation priorities framed for the deal thesis."
+        />
+        <PreviewCard
+          title="Confidence & sources"
+          body="An explicit confidence read with rationale, plus the list of live web sources used to build the analysis."
+        />
+      </div>
+
+      <p className="text-center text-[11px] text-slate-500">
+        {client.industry} · {client.deal_stage} · {client.client}
+      </p>
+    </div>
+  );
+}
+
+function PreviewCard({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        {title}
+      </p>
+      <p className="mt-1.5 text-sm text-slate-700">{body}</p>
     </div>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import { useNavVisibility } from "@/hooks/use-nav-visibility";
+import { PREVIEW_TABS } from "@/lib/preview-tabs";
 import { formatDate } from "@/lib/utils";
 import { ConnectionStatus } from "@/components/preview/connection-status";
 import { ProfileMenu } from "@/components/preview/profile-menu";
@@ -21,9 +22,30 @@ export function PreviewShell({
   chatPanel?: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { client, ready, allClients, selectedId, setSelectedId } =
     useSelectedPreviewClient();
-  const { visibleTabs } = useNavVisibility();
+  const { visibleTabs, hidden } = useNavVisibility();
+
+  // Enforce admin-hidden pages at the route level — a user can't reach a
+  // hidden page by typing the URL directly. Redirect to the Home tab.
+  useEffect(() => {
+    if (!pathname || hidden.length === 0) return;
+    // Match both /preview/<id> and /app/<id> aliases.
+    const match = PREVIEW_TABS.find((t) => {
+      const routes = [
+        t.href,
+        t.href.replace(/^\/app/, "/preview"),
+      ];
+      return routes.some(
+        (r) => pathname === r || pathname.startsWith(`${r}/`),
+      );
+    });
+    if (match && hidden.includes(match.id)) {
+      router.replace("/app");
+    }
+  }, [pathname, hidden, router]);
+
   const chatCtx = useChatPanel();
   const hasClient = ready && Boolean(client.target);
   const headerVisible = useAutoHideOnScroll();

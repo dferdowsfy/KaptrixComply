@@ -11,13 +11,45 @@
 
 export type Tier = "starter" | "professional" | "institutional";
 
+// Which report / analysis module a user is attempting to generate.
+// Each tier can allowlist a subset and cap each module independently.
+export type ReportKind =
+  | "ic_memo"          // IC-ready memo / full report export
+  | "scoring"          // Scoring module re-run
+  | "positioning"      // Contextual positioning analysis
+  | "insights"         // Insights / risk digest
+  | "coverage"         // Coverage diff / gap reanalysis
+  | "pre_analysis";    // Artifact pre-analysis pass
+
+export const ALL_REPORT_KINDS: ReportKind[] = [
+  "ic_memo",
+  "scoring",
+  "positioning",
+  "insights",
+  "coverage",
+  "pre_analysis",
+];
+
+export const REPORT_KIND_LABEL: Record<ReportKind, string> = {
+  ic_memo:      "IC memo / full report",
+  scoring:      "Scoring run",
+  positioning:  "Positioning analysis",
+  insights:     "Insights digest",
+  coverage:     "Coverage analysis",
+  pre_analysis: "Artifact pre-analysis",
+};
+
 export interface TierLimits {
   /** Max concurrently-active engagements. -1 = unlimited. */
   max_engagements: number;
-  /** Max reports generated per calendar month (UTC). -1 = unlimited. */
+  /** Max reports (any kind) generated per calendar month (UTC). -1 = unlimited. */
   max_reports_per_month: number;
   /** Max AI/chat queries per calendar month (UTC). -1 = unlimited. */
   max_ai_queries_per_month: number;
+  /** Which report kinds this tier is allowed to generate. */
+  reports_enabled: ReportKind[];
+  /** Per-report monthly caps. Missing key inherits max_reports_per_month. -1 = unlimited. */
+  per_report_caps: Partial<Record<ReportKind, number>>;
   /** Whether benchmarking / positioning module is unlocked. */
   benchmarking_enabled: boolean;
   /** Whether advanced / IC-grade report exports are unlocked. */
@@ -46,6 +78,13 @@ export const TIERS: Record<Tier, TierDefinition> = {
       max_engagements: 3,
       max_reports_per_month: 10,
       max_ai_queries_per_month: 100,
+      reports_enabled: ["scoring", "insights", "coverage", "pre_analysis"],
+      per_report_caps: {
+        scoring:      5,
+        insights:     5,
+        coverage:     10,
+        pre_analysis: 10,
+      },
       benchmarking_enabled: false,
       advanced_reports_enabled: false,
       priority_processing: false,
@@ -61,6 +100,22 @@ export const TIERS: Record<Tier, TierDefinition> = {
       max_engagements: 10,
       max_reports_per_month: 40,
       max_ai_queries_per_month: 500,
+      reports_enabled: [
+        "ic_memo",
+        "scoring",
+        "positioning",
+        "insights",
+        "coverage",
+        "pre_analysis",
+      ],
+      per_report_caps: {
+        ic_memo:      10,
+        scoring:      20,
+        positioning:  10,
+        insights:     20,
+        coverage:     40,
+        pre_analysis: 40,
+      },
       benchmarking_enabled: true,
       advanced_reports_enabled: true,
       priority_processing: false,
@@ -76,6 +131,22 @@ export const TIERS: Record<Tier, TierDefinition> = {
       max_engagements: -1,
       max_reports_per_month: -1,
       max_ai_queries_per_month: 2000,
+      reports_enabled: [
+        "ic_memo",
+        "scoring",
+        "positioning",
+        "insights",
+        "coverage",
+        "pre_analysis",
+      ],
+      per_report_caps: {
+        ic_memo:      -1,
+        scoring:      -1,
+        positioning:  -1,
+        insights:     -1,
+        coverage:     -1,
+        pre_analysis: -1,
+      },
       benchmarking_enabled: true,
       advanced_reports_enabled: true,
       priority_processing: true,
@@ -107,6 +178,15 @@ export function resolveLimits(
       overrides.max_ai_queries_per_month,
       base.max_ai_queries_per_month,
     ),
+    reports_enabled: Array.isArray(overrides.reports_enabled)
+      ? (overrides.reports_enabled.filter((k): k is ReportKind =>
+          (ALL_REPORT_KINDS as string[]).includes(k as string),
+        ) as ReportKind[])
+      : base.reports_enabled,
+    per_report_caps:
+      overrides.per_report_caps && typeof overrides.per_report_caps === "object"
+        ? { ...base.per_report_caps, ...overrides.per_report_caps }
+        : base.per_report_caps,
     benchmarking_enabled:
       typeof overrides.benchmarking_enabled === "boolean"
         ? overrides.benchmarking_enabled
@@ -124,6 +204,22 @@ export function resolveLimits(
         ? overrides.team_collaboration
         : base.team_collaboration,
   };
+}
+
+/** Cap for a specific report kind; falls back to the aggregate cap. */
+export function reportKindCap(
+  limits: TierLimits,
+  kind: ReportKind,
+): number {
+  const v = limits.per_report_caps[kind];
+  return typeof v === "number" ? v : limits.max_reports_per_month;
+}
+
+export function isReportKindEnabled(
+  limits: TierLimits,
+  kind: ReportKind,
+): boolean {
+  return limits.reports_enabled.includes(kind);
 }
 
 function pickLimit(override: unknown, fallback: number): number {
