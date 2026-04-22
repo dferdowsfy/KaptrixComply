@@ -309,17 +309,20 @@ function deriveScoreImpacts(
     });
   }
 
-  // Diligence priorities — ONE aggregated change (only if ≥ 2 new)
+  // Diligence priorities — ONE aggregated change (surface on any new priority)
   const prevPri = new Set(prevIntake?.diligence_priorities ?? []);
   const newPri  = (nextIntake.diligence_priorities ?? []).filter((p) => !prevPri.has(p));
-  if (newPri.length >= 2) {
+  if (newPri.length >= 1) {
     out.push({
       id: "impact:diligence_priorities",
       category: "score_impact",
       severity: "important",
       lifecycle: "new",
       priority: 5,
-      headline: `Analysis depth weighted toward ${newPri.length} client-specified risk areas`,
+      headline:
+        newPri.length === 1
+          ? `Analysis depth weighted toward ${newPri[0]}`
+          : `Analysis depth weighted toward ${newPri.length} client-specified risk areas`,
       reason: `Intake prioritised: ${newPri.slice(0, 3).join(", ")}${newPri.length > 3 ? ", and more" : ""}`,
       implication: "Evidence gaps in these areas will receive critical attention — collect targeted artifacts before IC submission",
       evidence_source: "Intake · Diligence Priorities",

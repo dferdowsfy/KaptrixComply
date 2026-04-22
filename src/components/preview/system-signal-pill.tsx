@@ -53,7 +53,7 @@ export function SystemSignalPill() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {panelOpen && (
-        <div className="pointer-events-auto w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-xl border border-indigo-200/70 bg-white shadow-[0_0_0_1px_rgba(99,102,241,0.08),0_10px_40px_-12px_rgba(79,70,229,0.25),0_0_24px_-6px_rgba(99,102,241,0.35)] sm:max-w-[380px]">
+        <div className="pointer-events-auto w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-xl border border-indigo-300 bg-white shadow-[0_0_0_1px_rgba(79,70,229,0.18),0_14px_44px_-14px_rgba(79,70,229,0.35),0_0_28px_-6px_rgba(99,102,241,0.45)] sm:max-w-[380px]">
           <KeyChangesPanel
             latest={current}
             history={history}
@@ -71,7 +71,7 @@ export function SystemSignalPill() {
         onClick={() => {
           if (hasContent) setPanelOpen((o) => !o);
         }}
-        className={`pointer-events-auto inline-flex max-w-[92vw] items-center gap-2 rounded-full border border-indigo-200/70 bg-white px-3.5 py-1.5 text-[12px] font-medium text-slate-700 shadow-[0_0_0_1px_rgba(99,102,241,0.06),0_4px_16px_-4px_rgba(79,70,229,0.2),0_0_16px_-4px_rgba(99,102,241,0.3)] transition-all duration-300 hover:border-indigo-300 hover:shadow-[0_0_0_1px_rgba(99,102,241,0.1),0_6px_22px_-4px_rgba(79,70,229,0.3),0_0_22px_-4px_rgba(99,102,241,0.45)] ${
+        className={`pointer-events-auto inline-flex max-w-[92vw] items-center gap-2 rounded-full border border-indigo-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-900 shadow-[0_0_0_1px_rgba(79,70,229,0.15),0_6px_20px_-4px_rgba(79,70,229,0.3),0_0_20px_-4px_rgba(99,102,241,0.4)] transition-all duration-300 hover:border-indigo-400 hover:shadow-[0_0_0_1px_rgba(79,70,229,0.22),0_8px_26px_-4px_rgba(79,70,229,0.42),0_0_26px_-4px_rgba(99,102,241,0.55)] ${
           current
             ? "translate-y-0 opacity-100"
             : "pointer-events-none translate-y-2 opacity-0"
@@ -79,14 +79,14 @@ export function SystemSignalPill() {
         aria-label={panelOpen ? "Close key changes" : "Open key changes"}
         aria-expanded={panelOpen}
       >
-        <span className="relative flex h-1.5 w-1.5 shrink-0" aria-hidden>
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-60" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-indigo-500" />
+        <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-70" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-indigo-600" />
         </span>
         <span className="truncate">{headline ?? ""}</span>
         <span
           aria-hidden
-          className={`text-slate-400 transition-transform duration-200 ${panelOpen ? "rotate-90" : ""}`}
+          className={`text-indigo-500 transition-transform duration-200 ${panelOpen ? "rotate-90" : ""}`}
         >
           ›
         </span>
@@ -114,12 +114,12 @@ function KeyChangesPanel({
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="relative flex h-1.5 w-1.5 shrink-0" aria-hidden>
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-indigo-500" />
+          <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-indigo-600" />
           </span>
-          <span className="text-[12px] font-semibold text-slate-900">
+          <span className="text-[13px] font-semibold text-slate-900">
             Key changes
           </span>
         </div>
@@ -195,8 +195,8 @@ function BatchBody({
   return (
     <div className="space-y-3">
       {!compact && batch.primaryInsight && (
-        <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2.5">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-600">
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-700">
             Primary insight
           </p>
           <p className="text-[13px] font-semibold leading-snug text-slate-900">
@@ -264,14 +264,14 @@ function ChangeCard({ change, rank }: { change: KeyChange; rank: number }) {
     (change.supporting_items?.length ?? 0) > 0 || !!change.reason;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <div className="rounded-lg border border-slate-300 bg-white p-3 shadow-sm">
       <div className="mb-1.5 flex items-center gap-1.5">
         <LifecycleBadge lifecycle={change.lifecycle} />
-        <span className="text-[10px] font-semibold text-slate-400">
+        <span className="text-[10px] font-semibold text-slate-500">
           #{rank}
         </span>
         {change.dimension && (
-          <span className="truncate text-[10px] font-medium uppercase tracking-wider text-slate-400">
+          <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500">
             {DIMENSION_SHORT_LABEL[change.dimension]}
           </span>
         )}
@@ -291,8 +291,8 @@ function ChangeCard({ change, rank }: { change: KeyChange; rank: number }) {
         {change.headline}
       </p>
 
-      <p className="mt-1 text-[12px] leading-snug text-slate-600">
-        <span className="text-slate-400">→ </span>
+      <p className="mt-1 text-[12px] leading-snug text-slate-700">
+        <span className="text-slate-500">→ </span>
         {change.implication}
       </p>
 
@@ -302,7 +302,7 @@ function ChangeCard({ change, rank }: { change: KeyChange; rank: number }) {
             type="button"
             onClick={() => setExpanded((o) => !o)}
             aria-expanded={expanded}
-            className="mt-2 inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100"
+            className="mt-2 inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 transition-colors hover:border-indigo-300 hover:bg-indigo-100"
           >
             <span
               aria-hidden

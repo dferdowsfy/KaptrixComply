@@ -15,9 +15,9 @@ import {
 const EMPTY_KB: ClientKb = {};
 const MAX_HISTORY        = 10;
 /** Wait for inactivity before emitting — prevents per-keystroke updates */
-const DEBOUNCE_MS        = 2500;
+const DEBOUNCE_MS        = 1200;
 /** Auto-dismiss the pill after this duration */
-const PILL_DISMISS_MS    = 6000;
+const PILL_DISMISS_MS    = 12000;
 
 export interface UseSystemSignalsResult {
   /** Currently visible batch — null when dismissed */
