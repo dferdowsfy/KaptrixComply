@@ -10,6 +10,10 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import {
+  isPreviewTabHidden,
+  type PreviewTabId,
+} from "@/lib/preview-access";
 
 export type AppRole = "admin" | "operator" | "analyst" | "reviewer" | "client_viewer";
 
@@ -102,6 +106,23 @@ export function requireRole(ctx: AuthContext, allowed: AppRole[]): void {
 export function requireAdmin(ctx: AuthContext): void {
   if (ctx.role !== "admin") {
     throw new AuthError(403, "forbidden_admin", "Admin access required");
+  }
+}
+
+/**
+ * Deny access to a preview capability when the admin has hidden the
+ * corresponding tab for the current user.
+ */
+export function assertPreviewTabVisible(
+  ctx: AuthContext,
+  tabId: PreviewTabId,
+): void {
+  if (isPreviewTabHidden(tabId, ctx.hidden_menu_keys)) {
+    throw new AuthError(
+      403,
+      "forbidden_hidden_tab",
+      "This page has been disabled for your account.",
+    );
   }
 }
 

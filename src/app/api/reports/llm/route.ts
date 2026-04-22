@@ -15,6 +15,7 @@ import {
   checkReportLimit,
   recordUsage,
 } from "@/lib/plans-server";
+import { assertPreviewTabVisible } from "@/lib/security/authz";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
   let userId: string | null = null;
   try {
     const authCtx = await requireAuth();
+    assertPreviewTabVisible(authCtx, "report");
     userId = authCtx.userId;
     const plan = await getUserPlanContext(authCtx.userId);
     if (plan) {

@@ -4,6 +4,12 @@ import { llmChat } from "@/lib/llm/client";
 import { openRouterChat, OPENROUTER_REPORT_MODEL } from "@/lib/llm/openrouter";
 import { getPreviewSnapshot } from "@/lib/preview/data";
 import { PREVIEW_CLIENTS } from "@/lib/preview-clients";
+import {
+  AuthError,
+  assertPreviewTabVisible,
+  authErrorResponse,
+  requireAuth,
+} from "@/lib/security/authz";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -110,6 +116,18 @@ function extractJson(text: string): unknown {
 }
 
 export async function POST(req: Request) {
+  // Anonymous callers may still use the public /preview demo. But if the
+  // caller IS authenticated, respect admin-hidden tabs as a server-side
+  // authorization check too.
+  try {
+    const authCtx = await requireAuth();
+    assertPreviewTabVisible(authCtx, "positioning");
+  } catch (err) {
+    if (!(err instanceof AuthError) || err.status !== 401) {
+      return authErrorResponse(err);
+    }
+  }
+
   const useOpenRouter = isOpenRouterConfigured();
   if (!useOpenRouter && !isSelfHostedLlmConfigured()) {
     return NextResponse.json(

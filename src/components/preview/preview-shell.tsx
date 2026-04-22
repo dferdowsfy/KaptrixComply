@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
-import { useNavVisibility } from "@/hooks/use-nav-visibility";
-import { PREVIEW_TABS } from "@/lib/preview-tabs";
-
-type NavTabIdList = Parameters<typeof useNavVisibility>[0];
+import { useNavVisibility, type NavTabId } from "@/hooks/use-nav-visibility";
+import {
+  isPreviewTabHidden,
+  resolvePreviewTabFromPath,
+} from "@/lib/preview-access";
 import { formatDate } from "@/lib/utils";
 import { ConnectionStatus } from "@/components/preview/connection-status";
 import { ProfileMenu } from "@/components/preview/profile-menu";
@@ -23,31 +24,20 @@ export function PreviewShell({
 }: {
   children: React.ReactNode;
   chatPanel?: React.ReactNode;
-  initialServerHidden?: string[];
+  initialServerHidden?: NavTabId[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const { client, ready, allClients, selectedId, setSelectedId } =
     useSelectedPreviewClient();
-  const { visibleTabs, hidden } = useNavVisibility(
-    (initialServerHidden ?? []) as NavTabIdList,
-  );
+  const { visibleTabs, hidden } = useNavVisibility(initialServerHidden ?? []);
 
   // Enforce admin-hidden pages at the route level — a user can't reach a
   // hidden page by typing the URL directly. Redirect to the Home tab.
   useEffect(() => {
     if (!pathname || hidden.length === 0) return;
-    // Match both /preview/<id> and /app/<id> aliases.
-    const match = PREVIEW_TABS.find((t) => {
-      const routes = [
-        t.href,
-        t.href.replace(/^\/app/, "/preview"),
-      ];
-      return routes.some(
-        (r) => pathname === r || pathname.startsWith(`${r}/`),
-      );
-    });
-    if (match && hidden.includes(match.id)) {
+    const tabId = resolvePreviewTabFromPath(pathname);
+    if (isPreviewTabHidden(tabId, hidden)) {
       router.replace("/app");
     }
   }, [pathname, hidden, router]);

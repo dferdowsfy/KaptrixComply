@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ChatPanelProvider } from "@/components/preview/chat-panel-context";
 import { KnowledgeChatPanel } from "@/components/preview/floating-knowledge-chatbot";
 import { PreviewShell } from "@/components/preview/preview-shell";
+import { type PreviewTabId } from "@/lib/preview-access";
 import { SystemSignalPill } from "@/components/preview/system-signal-pill";
 import { createClient } from "@/lib/supabase/server";
 
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 //      can redirect away from a hidden route without waiting for a client
 //      fetch.
 // ---------------------------------------------------------------------------
-async function loadServerHidden(): Promise<string[]> {
+async function loadServerHidden(): Promise<PreviewTabId[]> {
   try {
     const supabase = await createClient();
     const {
@@ -30,7 +31,7 @@ async function loadServerHidden(): Promise<string[]> {
       .eq("id", user.id)
       .maybeSingle();
     const keys = (data?.hidden_menu_keys as string[] | null) ?? [];
-    return keys.filter((k): k is string => typeof k === "string");
+    return keys.filter((k): k is PreviewTabId => typeof k === "string");
   } catch {
     return [];
   }
