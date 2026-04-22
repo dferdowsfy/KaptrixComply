@@ -114,14 +114,11 @@ export function useNavVisibility() {
       : [...current, id];
     writeHidden(next);
 
-    // Persist to server via PATCH /api/user/profile
-    fetch("/api/user/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hidden_menu_keys: next }),
-    }).catch(() => {
-      // Silently fail if server update doesn't work; localStorage is still set
-    });
+    // NOTE: user-side show/hide is intentionally LOCAL-ONLY (localStorage).
+    // The server column `users.hidden_menu_keys` is reserved for admin-
+    // enforced hides; writing a user's personal preferences to it would
+    // overwrite admin restrictions. Admin hides already flow back via
+    // `serverHidden` on every navigation/focus.
   }, []);
 
   const resetAll = useCallback(() => writeHidden([]), []);

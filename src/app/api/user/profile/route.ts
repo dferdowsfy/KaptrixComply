@@ -28,7 +28,11 @@ export async function GET() {
 
 /**
  * PATCH /api/user/profile
- * User can update their own hidden_menu_keys (and potentially other non-sensitive fields).
+ *
+ * Reserved for non-sensitive self-service profile edits. Notably, the
+ * `hidden_menu_keys` column is NOT writable here — that column is
+ * exclusively controlled by admins via /api/admin/users/:id so admin
+ * hides cannot be overwritten by the affected user's client.
  */
 export async function PATCH(request: NextRequest) {
   try {
@@ -37,12 +41,12 @@ export async function PATCH(request: NextRequest) {
 
     const patch: Record<string, unknown> = {};
 
-    if (Array.isArray(body.hidden_menu_keys)) {
-      patch.hidden_menu_keys = body.hidden_menu_keys
-        .filter((k: unknown): k is string => typeof k === "string")
-        .map((k: string) => k.trim())
-        .filter(Boolean);
-    }
+    // No user-writable fields are currently exposed here. `hidden_menu_keys`
+    // is intentionally admin-only. If/when additional self-service fields
+    // are introduced (e.g. phone, job_title), add them explicitly.
+
+    // Silently ignore attempts to write admin-controlled fields.
+    void body;
 
     if (Object.keys(patch).length === 0) {
       return NextResponse.json(
