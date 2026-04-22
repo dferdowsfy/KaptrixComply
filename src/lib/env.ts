@@ -1,3 +1,28 @@
+// =============================================================================
+// Environment detection
+// =============================================================================
+
+/** Which environment is this build running in. Defaults to 'development'. */
+export type AppEnv = "development" | "staging" | "production";
+
+export function getAppEnv(): AppEnv {
+  const raw = process.env.NEXT_PUBLIC_APP_ENV?.trim().toLowerCase();
+  if (raw === "production") return "production";
+  if (raw === "staging") return "staging";
+  return "development";
+}
+
+export const isDevelopment = (): boolean => getAppEnv() === "development";
+export const isStaging = (): boolean => getAppEnv() === "staging";
+export const isProduction = (): boolean => getAppEnv() === "production";
+
+/** App origin URL — used for absolute links, email callbacks, sitemaps. */
+export function getAppUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000";
+}
+
+// =============================================================================
+
 function isPlaceholder(value: string): boolean {
   const normalized = value.trim().toLowerCase();
   return (
