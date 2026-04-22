@@ -9,6 +9,7 @@ import {
   type ConfidenceShift,
   type KeyChange,
   type KeyChangesBatch,
+  type NetImpact,
 } from "@/lib/preview/system-signals";
 
 // ─── Display caps ─────────────────────────────────────────────────────────────
@@ -185,15 +186,24 @@ function BatchBody({
   batch: KeyChangesBatch;
   compact?: boolean;
 }) {
-  const critical = batch.changes
+  // Don't let supporting items restate the primary insight verbatim.
+  const primary = batch.primaryInsight.trim().toLowerCase();
+  const filtered = batch.changes.filter(
+    (c) => c.headline.trim().toLowerCase() !== primary,
+  );
+  const critical = filtered
     .filter((c) => c.severity === "critical")
     .slice(0, CRITICAL_CAP);
-  const important = batch.changes
+  const important = filtered
     .filter((c) => c.severity === "important")
     .slice(0, IMPORTANT_CAP);
 
   return (
     <div className="space-y-3">
+      {!compact && (
+        <NetImpactBlock impact={batch.netImpact} />
+      )}
+
       {!compact && batch.primaryInsight && (
         <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5">
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-700">
@@ -310,7 +320,7 @@ function ChangeCard({ change, rank }: { change: KeyChange; rank: number }) {
             >
               ›
             </span>
-            {expanded ? "Hide evidence" : "View evidence"}
+            {expanded ? "Hide rationale" : "View rationale"}
           </button>
           {expanded && (
             <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">
@@ -370,6 +380,48 @@ function ConfidenceBlock({ shift }: { shift: ConfidenceShift }) {
       <p className="mt-0.5 text-[12px] leading-snug text-slate-600">
         {shift.reason}
       </p>
+    </div>
+  );
+}
+
+// ─── Net impact block ─────────────────────────────────────────────────────────
+function NetImpactBlock({ impact }: { impact: NetImpact }) {
+  const { direction, confidence, note } = impact;
+  const label =
+    direction === "up"   ? "Improved"
+  : direction === "down" ? "Increased risk"
+  :                        "Mixed";
+  const arrow =
+    direction === "up"   ? "↑"
+  : direction === "down" ? "↓"
+  :                        "↔";
+  const arrowClass =
+    direction === "up"   ? "text-emerald-600"
+  : direction === "down" ? "text-rose-600"
+  :                        "text-slate-500";
+  const confDotClass =
+    confidence === "high"     ? "bg-emerald-500"
+  : confidence === "moderate" ? "bg-amber-500"
+  :                             "bg-slate-400";
+
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          Overall impact
+        </span>
+        <span className={`text-[15px] font-bold leading-none ${arrowClass}`} aria-hidden>
+          {arrow}
+        </span>
+        <span className="text-[13px] font-semibold text-slate-900">{label}</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className={`inline-block h-1.5 w-1.5 rounded-full ${confDotClass}`} aria-hidden />
+        <span className="text-[11px] font-medium text-slate-600">
+          {confidence} confidence
+          {note ? <span className="text-slate-400"> · {note}</span> : null}
+        </span>
+      </div>
     </div>
   );
 }

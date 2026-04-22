@@ -106,9 +106,21 @@ export interface ConfidenceShift {
   reason: string;
 }
 
+export type NetImpactDirection = "up" | "down" | "mixed";
+export type NetImpactConfidence = "high" | "moderate" | "low";
+
+export interface NetImpact {
+  direction: NetImpactDirection;
+  confidence: NetImpactConfidence;
+  /** Short context clause shown after the indicator (e.g. "incomplete evidence") */
+  note?: string;
+}
+
 export interface KeyChangesBatch {
   id: string;
   created_at: string;
+  /** Net directional summary shown at the top of the panel */
+  netImpact: NetImpact;
   /** Single sentence capturing the most important shift — shown at top of panel */
   primaryInsight: string;
   /** All changes, sorted by priority ascending */
@@ -152,7 +164,7 @@ function deriveIntakeRisks(
           : `Regulatory exposure confirmed across ${newReg.length} frameworks`,
       reason: `Intake flagged: ${newReg.join(", ")}`,
       implication: IMPLICATION.data_sensitivity.down,
-      evidence_source: "Intake · Regulatory Exposure",
+      evidence_source: "From intake: regulatory exposure",
       supporting_items: newReg,
     });
   }
@@ -172,7 +184,7 @@ function deriveIntakeRisks(
       headline: `Prior concern${newFlags.length > 1 ? "s" : ""} flagged — validation required in this engagement`,
       reason: `${newFlags.length} prior red-flag concern${newFlags.length > 1 ? "s" : ""} carried from intake`,
       implication: IMPLICATION.open_validation.down,
-      evidence_source: "Intake · Prior Red Flags",
+      evidence_source: "From intake: prior red flags",
       supporting_items: newFlags,
     });
   }
@@ -212,11 +224,11 @@ function derivePreAnalysisRisks(
       direction: "down",
       headline:
         flags.length === 1
-          ? `Critical risk identified — ${dimLabel}`
-          : `${flags.length} critical findings in ${dimLabel}`,
-      reason: flags.length === 1 ? flags[0] : `${flags.length} critical findings identified in pre-analysis`,
-      implication: dim ? IMPLICATION[dim].down : "May materially affect investment viability — targeted validation required",
-      evidence_source: "Pre-Analysis · Document Review",
+          ? `${dimLabel} — critical exposure identified`
+          : `${dimLabel} — ${flags.length} critical exposures identified`,
+      reason: flags.length === 1 ? flags[0] : `${flags.length} critical findings surfaced during document review`,
+      implication: dim ? IMPLICATION[dim].down : "Material risk to investment viability — targeted validation required before IC",
+      evidence_source: "From artifact review: pre-analysis",
       supporting_items: flags,
     });
   }
@@ -239,10 +251,13 @@ function derivePreAnalysisRisks(
       priority: basePri,
       dimension: dim ?? undefined,
       direction: "down",
-      headline: flags.length === 1 ? `Risk identified — ${dimLabel}` : `${flags.length} findings in ${dimLabel}`,
-      reason: flags.length === 1 ? flags[0] : `${flags.length} findings identified in pre-analysis`,
-      implication: dim ? IMPLICATION[dim].down : "Requires targeted validation before IC submission",
-      evidence_source: "Pre-Analysis · Document Review",
+      headline:
+        flags.length === 1
+          ? `${dimLabel} — new concern identified`
+          : `${dimLabel} — ${flags.length} concerns identified`,
+      reason: flags.length === 1 ? flags[0] : `${flags.length} concerns surfaced during document review`,
+      implication: dim ? IMPLICATION[dim].down : "Targeted validation required before IC submission",
+      evidence_source: "From artifact review: pre-analysis",
       supporting_items: flags,
     });
   }
@@ -268,28 +283,28 @@ function deriveScoreImpacts(
     let supporting: string[] = [];
 
     if (et.startsWith("Corporate IC")) {
-      headline    = "Analysis calibrated for Corporate IC engagement";
-      reason      = "Engagement type set to Corporate IC — findings will be framed for an investment committee audience";
-      implication = "Evidence collection should prioritise AI value proof, customer validation, and governance readiness";
+      headline    = "Evidence bar raised for investment-committee review";
+      reason      = "Deal positioned for IC review — findings must withstand committee-level scrutiny";
+      implication = "AI value proof, customer validation, and governance readiness carry the most weight for this engagement";
       supporting  = [
-        "Product Credibility — primary focus on AI differentiation and claim substantiation",
-        "Governance & Safety — weighted for IC committee readiness, not day-to-day operations",
+        "AI differentiation and claim substantiation become primary evidence focus",
+        "Governance posture is evaluated against committee-readiness, not day-to-day operations",
       ];
     } else if (et.startsWith("PE") || et.startsWith("Growth") || et.startsWith("Portfolio")) {
-      headline    = "Analysis calibrated for PE / Growth Equity diligence";
-      reason      = "Engagement type set to PE diligence — findings will be framed for investment thesis validation";
-      implication = "Evidence collection should prioritise production proof, scalability, and exit readiness";
+      headline    = "Evidence bar raised for growth-equity diligence";
+      reason      = "Deal positioned for PE / growth diligence — thesis defensibility at exit is the dominant lens";
+      implication = "Production proof, scalability evidence, and exit-readiness artifacts carry the most weight for this engagement";
       supporting  = [
-        "Open Validation — higher evidence bar required before IC",
-        "Production Readiness — stress-tested for growth and scale trajectory",
+        "Evidence bar increases for open questions before IC",
+        "Production readiness is stress-tested against the growth trajectory",
       ];
     } else if (et.startsWith("Vendor selection")) {
-      headline    = "Analysis calibrated for Vendor Selection evaluation";
-      reason      = "Engagement type set to vendor selection — fit, risk, and switching costs are the primary lens";
-      implication = "Vendor lock-in, integration complexity, and contract terms will receive elevated scrutiny";
+      headline    = "Vendor-risk lens applied to the assessment";
+      reason      = "Deal positioned as vendor selection — fit, concentration risk, and switching cost are the dominant lens";
+      implication = "Vendor lock-in, integration complexity, and contract terms carry the most weight for this engagement";
       supporting  = [
-        "Tooling & Vendor Exposure — primary focus on concentration risk and switching costs",
-        "Production Readiness — evaluated against buyer's operational requirements",
+        "Concentration risk and switching cost become primary evidence focus",
+        "Production readiness is evaluated against the buyer’s operational requirements",
       ];
     } else {
       return out;
@@ -304,7 +319,7 @@ function deriveScoreImpacts(
       headline,
       reason,
       implication,
-      evidence_source: "Intake · Engagement Type",
+      evidence_source: "From intake: engagement type",
       supporting_items: supporting,
     });
   }
@@ -321,11 +336,11 @@ function deriveScoreImpacts(
       priority: 5,
       headline:
         newPri.length === 1
-          ? `Analysis depth weighted toward ${newPri[0]}`
-          : `Analysis depth weighted toward ${newPri.length} client-specified risk areas`,
-      reason: `Intake prioritised: ${newPri.slice(0, 3).join(", ")}${newPri.length > 3 ? ", and more" : ""}`,
-      implication: "Evidence gaps in these areas will receive critical attention — collect targeted artifacts before IC submission",
-      evidence_source: "Intake · Diligence Priorities",
+          ? `Evidence bar raised around ${newPri[0]}`
+          : `Evidence bar raised across ${newPri.length} client-specified risk areas`,
+      reason: `Client flagged as priority: ${newPri.slice(0, 3).join(", ")}${newPri.length > 3 ? ", and more" : ""}`,
+      implication: "Unresolved questions in these areas carry the most weight on the final assessment",
+      evidence_source: "From intake: diligence priorities",
       supporting_items: newPri,
     });
   }
@@ -356,11 +371,11 @@ function deriveCoverageChanges(
       priority: sev === "critical" ? 2 : 4,
       headline:
         newGaps.length === 1
-          ? `Required artifact not yet provided — ${newGaps[0]}`
-          : `${newGaps.length} required artifacts not yet provided`,
-      reason: "Industry standards for this engagement require these artifacts for complete scoring",
-      implication: "Missing artifacts reduce scoring confidence — collect before final IC submission to avoid unresolved open items",
-      evidence_source: "Coverage · Document Requirements",
+          ? `Missing artifact introduces evidence gap — ${newGaps[0]}`
+          : `${newGaps.length} missing artifacts introduce evidence gaps`,
+      reason: "Required for complete scoring under this engagement’s evidence standard",
+      implication: "Open questions remain on the final assessment until these artifacts are provided",
+      evidence_source: "From coverage: required artifacts",
       supporting_items: newGaps,
     });
   }
@@ -374,11 +389,11 @@ function deriveCoverageChanges(
       priority: 6,
       headline:
         resolvedGaps.length === 1
-          ? `Coverage gap resolved — ${resolvedGaps[0]}`
-          : `${resolvedGaps.length} coverage gaps resolved`,
-      reason: "Previously missing artifacts have been provided",
-      implication: "Scoring confidence increases as evidence coverage improves — diligence completeness is strengthening",
-      evidence_source: "Coverage · Document Requirements",
+          ? `Evidence gap resolved — ${resolvedGaps[0]}`
+          : `${resolvedGaps.length} evidence gaps resolved`,
+      reason: "Previously missing artifacts are now available",
+      implication: "Confidence in the assessment strengthens as supporting evidence is provided",
+      evidence_source: "From coverage: artifact uploaded",
       supporting_items: resolvedGaps,
     });
   }
@@ -403,7 +418,7 @@ function deriveConfidenceShift(prev: ClientKb, next: ClientKb): ConfidenceShift 
       return {
         direction: "up",
         headline: "Evidence base strengthened",
-        reason: `Pre-analysis completed across ${nextPa.analyses_total} documents — scoring dimensions have stronger evidentiary support`,
+        reason: `Document review covered ${nextPa.analyses_total} artifacts without new critical findings — assessment stands on stronger evidentiary support`,
       };
     }
   }
@@ -413,8 +428,8 @@ function deriveConfidenceShift(prev: ClientKb, next: ClientKb): ConfidenceShift 
     const delta = prevCov.gaps_count - nextCov.gaps_count;
     return {
       direction: "up",
-      headline: "Coverage gap resolved",
-      reason: `Artifact coverage improved — ${delta} previously missing item${delta > 1 ? "s" : ""} provided`,
+      headline: "Confidence increased",
+      reason: `${delta} previously missing artifact${delta > 1 ? "s" : ""} now available — supporting evidence for the assessment expanded`,
     };
   }
 
@@ -426,8 +441,8 @@ function deriveConfidenceShift(prev: ClientKb, next: ClientKb): ConfidenceShift 
     if (newCrit.length > 0) {
       return {
         direction: "down",
-        headline: "Critical findings introduce scoring uncertainty",
-        reason: `${newCrit.length} new critical finding${newCrit.length > 1 ? "s" : ""} require targeted evidence to resolve before final scoring`,
+        headline: "Confidence decreased",
+        reason: `${newCrit.length} new critical finding${newCrit.length > 1 ? "s" : ""} — assessment stands on less complete evidence until resolved`,
       };
     }
   }
@@ -437,8 +452,8 @@ function deriveConfidenceShift(prev: ClientKb, next: ClientKb): ConfidenceShift 
     const delta = nextCov.gaps_count - prevCov.gaps_count;
     return {
       direction: "down",
-      headline: "Evidence coverage gaps identified",
-      reason: `${delta} additional required artifact${delta > 1 ? "s" : ""} not yet provided — scoring relies on incomplete evidence`,
+      headline: "Confidence decreased",
+      reason: `${delta} additional required artifact${delta > 1 ? "s" : ""} missing — assessment stands on less complete evidence until provided`,
     };
   }
 
@@ -447,30 +462,94 @@ function deriveConfidenceShift(prev: ClientKb, next: ClientKb): ConfidenceShift 
 
 // ─── Primary Insight ─────────────────────────────────────────────────────────
 // Single sentence at the top of the panel. Analyst tone, IC-ready.
+// Must describe what changed in the ASSESSMENT — not the system behaviour.
+
+const DIM_PRIMARY_CRITICAL: Record<ScoreDimension, string> = {
+  data_sensitivity:     "Data risk is now the primary constraint on deal viability",
+  governance_safety:    "Governance risk is now the primary constraint for enterprise adoption",
+  product_credibility:  "AI differentiation remains unproven based on current evidence",
+  tooling_exposure:     "Vendor concentration is now the dominant downside risk",
+  production_readiness: "Production readiness is the primary open question on the growth thesis",
+  open_validation:      "Critical open questions remain before the assessment is decision-ready",
+};
+
+const DIM_PRIMARY_IMPORTANT: Record<ScoreDimension, string> = {
+  data_sensitivity:     "Data-handling risk is a material concern on this deal",
+  governance_safety:    "Governance posture is a material open question for enterprise adoption",
+  product_credibility:  "AI value claims require additional validation",
+  tooling_exposure:     "Vendor exposure is a material risk to long-term optionality",
+  production_readiness: "Scalability at growth trajectory remains unvalidated",
+  open_validation:      "Material open questions remain before the assessment is decision-ready",
+};
 
 function derivePrimaryInsight(changes: KeyChange[], confidence: ConfidenceShift | null): string {
   const topCritRisk = changes.find((c) => c.severity === "critical" && c.category === "risk");
-  if (topCritRisk) {
-    return topCritRisk.dimension
-      ? `${DIMENSION_SHORT_LABEL[topCritRisk.dimension]} is the primary risk factor — requires resolution before IC submission`
-      : "Critical risk identified — requires resolution before IC submission";
-  }
+  if (topCritRisk?.dimension) return DIM_PRIMARY_CRITICAL[topCritRisk.dimension];
+  if (topCritRisk)            return "A critical risk is now the primary constraint on deal viability";
 
   const critGap = changes.find((c) => c.severity === "critical" && c.category === "gap");
-  if (critGap) return "Artifact collection is the primary gating factor for decision readiness";
+  if (critGap) return "Missing artifacts are now the primary constraint on decision readiness";
+
+  const topImportantRisk = changes.find((c) => c.severity === "important" && c.category === "risk");
+  if (topImportantRisk?.dimension) return DIM_PRIMARY_IMPORTANT[topImportantRisk.dimension];
+
+  const resolved = changes.find((c) => c.lifecycle === "resolved");
+  if (resolved) return "Evidence coverage has strengthened — the assessment is more decision-ready";
+
+  if (confidence?.direction === "down") return "Confidence in the assessment has weakened on incomplete evidence";
+  if (confidence?.direction === "up")   return "Confidence in the assessment has strengthened on new evidence";
 
   const scoreImpact = changes.find((c) => c.category === "score_impact");
   if (scoreImpact) return scoreImpact.headline;
 
-  if (confidence?.direction === "down") {
-    return "Missing evidence is limiting scoring confidence — prioritise artifact collection";
-  }
-  if (confidence?.direction === "up") {
-    return "Evidence base is strengthening — diligence is converging toward decision readiness";
-  }
-
   const top = changes[0];
   return top ? top.headline : "";
+}
+
+// ─── Net Impact ──────────────────────────────────────────────────────────────
+// Directional summary of the overall effect of all surfaced changes.
+
+function deriveNetImpact(
+  changes: KeyChange[],
+  confidence: ConfidenceShift | null,
+  nextKb: ClientKb,
+): NetImpact {
+  // Direction: weight critical risks heavily, resolved items as positive
+  let downWeight = 0;
+  let upWeight = 0;
+
+  for (const c of changes) {
+    if (c.lifecycle === "resolved") { upWeight += 2; continue; }
+    if (c.direction === "up")       { upWeight += (c.severity === "critical" ? 2 : 1); continue; }
+    if (c.direction === "down" || c.category === "risk" || c.category === "gap") {
+      downWeight += (c.severity === "critical" ? 3 : 1);
+    }
+  }
+  if (confidence?.direction === "up")   upWeight   += 1;
+  if (confidence?.direction === "down") downWeight += 1;
+
+  let direction: NetImpactDirection;
+  if (upWeight === 0 && downWeight === 0) {
+    direction = confidence?.direction === "up" ? "up" : confidence?.direction === "down" ? "down" : "mixed";
+  } else if (upWeight > 0 && downWeight > 0) {
+    direction = "mixed";
+  } else {
+    direction = downWeight > upWeight ? "down" : "up";
+  }
+
+  // Confidence: based on completeness of the evidence base
+  const cov = nextKb.coverage?.payload.kind === "coverage" ? nextKb.coverage.payload : undefined;
+  const pa  = nextKb.pre_analysis?.payload.kind === "pre_analysis" ? nextKb.pre_analysis.payload : undefined;
+  const gaps   = cov?.gaps_count ?? 0;
+  const docs   = pa?.analyses_total ?? 0;
+
+  let confLevel: NetImpactConfidence;
+  if (gaps === 0 && docs >= 3)      confLevel = "high";
+  else if (gaps <= 2 && docs >= 1)  confLevel = "moderate";
+  else                              confLevel = "low";
+
+  const note = confLevel === "low" ? "incomplete evidence" : undefined;
+  return { direction, confidence: confLevel, note };
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────
@@ -514,10 +593,12 @@ export function buildKeyChangesBatch(prev: ClientKb, next: ClientKb): KeyChanges
   const hasMore = totalCritical > CRITICAL_CAP || totalImportant > IMPORTANT_CAP;
 
   const primaryInsight = derivePrimaryInsight(raw, confidenceShift);
+  const netImpact      = deriveNetImpact(raw, confidenceShift, next);
 
   return {
     id: `batch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
     created_at: new Date().toISOString(),
+    netImpact,
     primaryInsight,
     changes: raw,
     confidenceShift,
