@@ -90,11 +90,23 @@ export function AdminPanel() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
+          cache: "no-store",
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+        // Use the server's post-write row as the source of truth so the UI
+        // reflects what actually landed in the DB (not an optimistic guess).
+        const persisted = (data?.user ?? {}) as Partial<AdminUserRow>;
         setUsers((rows) =>
-          rows.map((r) => (r.id === id ? { ...r, ...patch } as AdminUserRow : r)),
+          rows.map((r) =>
+            r.id === id
+              ? ({
+                  ...r,
+                  ...patch,
+                  ...persisted,
+                } as AdminUserRow)
+              : r,
+          ),
         );
         setToast("Saved");
       } catch (e) {

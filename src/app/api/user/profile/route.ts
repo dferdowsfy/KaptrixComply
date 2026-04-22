@@ -13,14 +13,21 @@ export async function GET() {
   try {
     const ctx = await requireAuth();
 
-    return NextResponse.json({
-      id: ctx.userId,
-      email: ctx.email,
-      role: ctx.role,
-      approved: ctx.approved,
-      hidden_menu_keys: ctx.hidden_menu_keys,
-      is_admin: ctx.role === "admin",
-    });
+    return NextResponse.json(
+      {
+        id: ctx.userId,
+        email: ctx.email,
+        role: ctx.role,
+        approved: ctx.approved,
+        hidden_menu_keys: ctx.hidden_menu_keys,
+        is_admin: ctx.role === "admin",
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, must-revalidate",
+        },
+      },
+    );
   } catch (err) {
     return authErrorResponse(err);
   }

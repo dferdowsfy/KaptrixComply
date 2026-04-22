@@ -157,6 +157,115 @@ export function IndustryCoverageMatrix({
     return byCat;
   }, [uploadedDocs]);
 
+  // Standalone JSX for the custom-artifact uploader. Rendered above the
+  // coverage table so operators find it without scrolling past the full
+  // required-artifact list.
+  const customArtifactCard = (
+    <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/60 via-white to-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700">
+            Other artifact · upload anything
+          </p>
+          <h3 className="mt-1 text-base font-semibold text-slate-900">
+            Upload a custom artifact
+          </h3>
+          <p className="mt-0.5 max-w-xl text-xs text-slate-600">
+            Anything outside the standard list — name it and we&apos;ll store
+            it in the knowledge base under that label.
+          </p>
+        </div>
+      </div>
+
+      <input
+        ref={customFileInputRef}
+        type="file"
+        multiple
+        accept={UPLOAD_ACCEPT_ATTR}
+        className="sr-only"
+        onChange={handleCustomFileChange}
+      />
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Name<span className="text-rose-500"> *</span>
+          </span>
+          <input
+            type="text"
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            placeholder="e.g. Customer reference call notes"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Kind (optional)
+          </span>
+          <select
+            value={customKind}
+            onChange={(e) => setCustomKind(e.target.value)}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none"
+          >
+            <option value="">Select a kind…</option>
+            <option value="evidence">Evidence / primary source</option>
+            <option value="analysis">Analysis / write-up</option>
+            <option value="contract">Contract / agreement</option>
+            <option value="report">Report / summary</option>
+            <option value="data">Data export / spreadsheet</option>
+            <option value="notes">Meeting notes</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <div className="flex items-end">
+          <button
+            type="button"
+            disabled={!clientId || !customCategory}
+            onClick={handleCustomUploadClick}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          >
+            Choose file & upload
+          </button>
+        </div>
+      </div>
+
+      {(() => {
+        const custom = uploadedDocs.filter((d) => d.category.startsWith("custom_"));
+        if (custom.length === 0) return null;
+        const byCat: Record<string, UploadedDoc[]> = {};
+        for (const d of custom) (byCat[d.category] ??= []).push(d);
+        return (
+          <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Custom artifacts in knowledge base
+            </p>
+            {Object.entries(byCat).map(([cat, docs]) => {
+              const label = cat
+                .replace(/^custom_/, "")
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase());
+              return (
+                <div
+                  key={cat}
+                  className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2"
+                >
+                  <p className="text-sm font-semibold text-slate-900">{label}</p>
+                  <p className="text-[11px] text-slate-500">
+                    <span className="font-mono uppercase tracking-wide">{cat}</span>
+                    {" · "}
+                    {docs.length} file{docs.length > 1 ? "s" : ""}
+                  </p>
+                  <RowUploads uploads={docs} compact />
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+    </div>
+  );
+
   return (
     <div className="space-y-5">
       {/* Hidden input drives every Upload button on the page. */}
@@ -292,6 +401,10 @@ export function IndustryCoverageMatrix({
         </div>
       </div>
 
+      {/* Custom artifact upload — placed above the coverage table so it's
+         always visible without scrolling past the full required list. */}
+      {customArtifactCard}
+
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
         <table className="w-full">
           <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
@@ -411,111 +524,6 @@ export function IndustryCoverageMatrix({
             })}
           </tbody>
         </table>
-      </div>
-
-      {/* Custom / other artifact upload — named by the user, stored in KB under a custom_<slug> category. */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Other artifact
-            </p>
-            <h3 className="mt-1 text-base font-semibold text-slate-900">
-              Upload a custom artifact
-            </h3>
-            <p className="mt-0.5 max-w-xl text-xs text-slate-500">
-              Anything outside the standard list — name it and we&apos;ll store it in the knowledge base under that label.
-            </p>
-          </div>
-        </div>
-
-        <input
-          ref={customFileInputRef}
-          type="file"
-          multiple
-          accept={UPLOAD_ACCEPT_ATTR}
-          className="sr-only"
-          onChange={handleCustomFileChange}
-        />
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Name<span className="text-rose-500"> *</span>
-            </span>
-            <input
-              type="text"
-              value={customName}
-              onChange={(e) => setCustomName(e.target.value)}
-              placeholder="e.g. Customer reference call notes"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Kind (optional)
-            </span>
-            <select
-              value={customKind}
-              onChange={(e) => setCustomKind(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none"
-            >
-              <option value="">Select a kind…</option>
-              <option value="evidence">Evidence / primary source</option>
-              <option value="analysis">Analysis / write-up</option>
-              <option value="contract">Contract / agreement</option>
-              <option value="report">Report / summary</option>
-              <option value="data">Data export / spreadsheet</option>
-              <option value="notes">Meeting notes</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <div className="flex items-end">
-            <button
-              type="button"
-              disabled={!clientId || !customCategory}
-              onClick={handleCustomUploadClick}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-            >
-              Choose file & upload
-            </button>
-          </div>
-        </div>
-
-        {/* Render any previously uploaded custom artifacts so users see them persist. */}
-        {(() => {
-          const custom = uploadedDocs.filter((d) => d.category.startsWith("custom_"));
-          if (custom.length === 0) return null;
-          const byCat: Record<string, UploadedDoc[]> = {};
-          for (const d of custom) (byCat[d.category] ??= []).push(d);
-          return (
-            <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Custom artifacts in knowledge base
-              </p>
-              {Object.entries(byCat).map(([cat, docs]) => {
-                const label = cat
-                  .replace(/^custom_/, "")
-                  .replace(/_/g, " ")
-                  .replace(/\b\w/g, (c) => c.toUpperCase());
-                return (
-                  <div
-                    key={cat}
-                    className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2"
-                  >
-                    <p className="text-sm font-semibold text-slate-900">{label}</p>
-                    <p className="text-[11px] text-slate-500">
-                      <span className="font-mono uppercase tracking-wide">{cat}</span>
-                      {" · "}
-                      {docs.length} file{docs.length > 1 ? "s" : ""}
-                    </p>
-                    <RowUploads uploads={docs} compact />
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
       </div>
     </div>
   );
