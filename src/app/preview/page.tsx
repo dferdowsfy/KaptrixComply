@@ -65,7 +65,7 @@ export default function PreviewHomePage() {
 
   const openClient = (id: string) => {
     setSelectedId(id);
-    router.push("/app/overview");
+    router.push("/preview/intake");
   };
 
   return (
