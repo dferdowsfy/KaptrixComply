@@ -67,6 +67,24 @@ export function getOpenRouterApiKey(): string {
   return getServerEnv("OPENROUTER_API_KEY");
 }
 
+/**
+ * Enforce OpenRouter zero-data-retention routing. When true (default), every
+ * OpenRouter request is sent with `provider.data_collection: "deny"`, which
+ * instructs OpenRouter to route ONLY through upstream providers that have
+ * certified they do not log or retain prompts/completions. If no compliant
+ * provider exists for the requested model, the request fails closed (HTTP
+ * error) rather than falling back to a logging provider — the correct
+ * behaviour when handling sensitive diligence data.
+ *
+ * Set OPENROUTER_ZERO_RETENTION="false" in Vercel to opt out (NOT
+ * recommended for production).
+ */
+export function getOpenRouterZeroRetention(): boolean {
+  const v = getServerEnv("OPENROUTER_ZERO_RETENTION").toLowerCase().trim();
+  if (v === "false" || v === "0" || v === "no") return false;
+  return true; // secure-by-default
+}
+
 export interface OpenRouterEnvDebugInfo {
   configured: boolean;
   present: boolean;

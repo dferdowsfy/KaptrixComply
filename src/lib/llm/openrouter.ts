@@ -1,9 +1,23 @@
 /**
  * Lightweight OpenRouter client. Uses the OpenAI-compatible
  * /chat/completions endpoint. Pay-per-token, no rate-limit wall.
+ *
+ * PRIVACY / SECURITY
+ * ──────────────────
+ * Diligence artefacts (intake, uploaded PDFs/PPTX, extracted insights,
+ * scoring context) are sensitive customer data. We therefore enforce
+ * OpenRouter's zero-data-retention routing on every request by default:
+ *
+ *   provider: {
+ *     data_collection: "deny",   // only providers that do NOT log prompts
+ *     allow_fallbacks: false,    // fail closed if none available
+ *   }
+ *
+ * See https://openrouter.ai/docs/features/provider-routing#data-collection
+ * This can be disabled (NOT recommended) via OPENROUTER_ZERO_RETENTION=false.
  */
 
-import { getOpenRouterApiKey } from "@/lib/env";
+import { getOpenRouterApiKey, getOpenRouterZeroRetention } from "@/lib/env";
 
 export interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
@@ -45,6 +59,17 @@ export async function openRouterChat(
     body.response_format = { type: "json_object" };
   }
 
+  // Zero-data-retention enforcement. When enabled (default), OpenRouter
+  // will only route to upstream providers that have certified they do
+  // not log prompts/completions. allow_fallbacks=false ensures we fail
+  // closed rather than silently downgrade to a logging provider.
+  if (getOpenRouterZeroRetention()) {
+    body.provider = {
+      data_collection: "deny",
+      allow_fallbacks: false,
+    };
+  }
+
   const timeoutMs = opts.timeoutMs ?? 120_000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -75,6 +100,21 @@ export async function openRouterChat(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
+    // Surface a clear message when the zero-retention constraint is the
+    // reason the request failed, so the operator knows to either pick a
+    // different model (one with ZDR-certified providers) or relax the
+    // constraint via env var.
+    const zdr = getOpenRouterZeroRetention();
+    const looksLikeZdrDenial =
+      zdr &&
+      (errText.toLowerCase().includes("data_collection") ||
+        errText.toLowerCase().includes("no providers available") ||
+        errText.toLowerCase().includes("no allowed providers"));
+    if (looksLikeZdrDenial) {
+      throw new Error(
+        "OpenRouter blocked the request because no zero-data-retention provider is available for the requested model. Pick a different model or (NOT recommended) set OPENROUTER_ZERO_RETENTION=false.",
+      );
+    }
     throw new Error(`OpenRouter HTTP ${res.status}: ${errText || res.statusText}`);
   }
 
