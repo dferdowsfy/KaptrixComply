@@ -53,7 +53,7 @@ export function SystemSignalPill() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {panelOpen && (
-        <div className="pointer-events-auto w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_10px_40px_-12px_rgba(15,23,42,0.18)] sm:max-w-[380px]">
+        <div className="pointer-events-auto w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-xl border border-indigo-200/70 bg-white shadow-[0_0_0_1px_rgba(99,102,241,0.08),0_10px_40px_-12px_rgba(79,70,229,0.25),0_0_24px_-6px_rgba(99,102,241,0.35)] sm:max-w-[380px]">
           <KeyChangesPanel
             latest={current}
             history={history}
@@ -71,7 +71,7 @@ export function SystemSignalPill() {
         onClick={() => {
           if (hasContent) setPanelOpen((o) => !o);
         }}
-        className={`pointer-events-auto inline-flex max-w-[92vw] items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-[12px] font-medium text-slate-700 shadow-[0_4px_16px_-4px_rgba(15,23,42,0.12)] transition-all duration-300 hover:border-slate-300 hover:shadow-[0_6px_20px_-4px_rgba(15,23,42,0.16)] ${
+        className={`pointer-events-auto inline-flex max-w-[92vw] items-center gap-2 rounded-full border border-indigo-200/70 bg-white px-3.5 py-1.5 text-[12px] font-medium text-slate-700 shadow-[0_0_0_1px_rgba(99,102,241,0.06),0_4px_16px_-4px_rgba(79,70,229,0.2),0_0_16px_-4px_rgba(99,102,241,0.3)] transition-all duration-300 hover:border-indigo-300 hover:shadow-[0_0_0_1px_rgba(99,102,241,0.1),0_6px_22px_-4px_rgba(79,70,229,0.3),0_0_22px_-4px_rgba(99,102,241,0.45)] ${
           current
             ? "translate-y-0 opacity-100"
             : "pointer-events-none translate-y-2 opacity-0"
