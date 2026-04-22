@@ -17,7 +17,7 @@ import {
   isOpenRouterConfigured,
 } from "@/lib/env";
 import { llmChat } from "@/lib/llm/client";
-import { openRouterChat, OPENROUTER_REPORT_MODEL } from "@/lib/llm/openrouter";
+import { openRouterChat, getOpenRouterModel } from "@/lib/llm/openrouter";
 import { SCORING_DIMENSIONS } from "@/lib/constants";
 import type { DimensionConfig } from "@/lib/types";
 import {
@@ -133,7 +133,7 @@ async function scoreDimension(
     raw = result.content;
   } else {
     const result = await openRouterChat({
-      model: OPENROUTER_REPORT_MODEL,
+      model: getOpenRouterModel("scoring"),
       messages,
       temperature: 0.1,
       maxTokens,

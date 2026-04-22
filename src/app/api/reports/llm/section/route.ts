@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { isSelfHostedLlmConfigured, getSelfHostedLlmModelForTask, isOpenRouterConfigured } from "@/lib/env";
 import { llmChat } from "@/lib/llm/client";
-import { openRouterChat, OPENROUTER_REPORT_MODEL } from "@/lib/llm/openrouter";
+import { openRouterChat, getOpenRouterModel } from "@/lib/llm/openrouter";
 import { getPreviewSnapshot } from "@/lib/preview/data";
 import { buildReportEvidenceContext, readKnowledgeBaseText } from "@/lib/reports/context";
 import {
@@ -178,7 +178,7 @@ Return markdown only. No preamble. No closing remark. No code fences.`;
     if (useOpenRouter) {
       // OpenRouter: pay-per-token, no rate-limit wall.
       const resp = await openRouterChat({
-        model: OPENROUTER_REPORT_MODEL,
+        model: getOpenRouterModel("report"),
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

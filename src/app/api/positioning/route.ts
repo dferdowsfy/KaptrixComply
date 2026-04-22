@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isSelfHostedLlmConfigured, getSelfHostedLlmModel, getSelfHostedLlmModelForTask, isOpenRouterConfigured } from "@/lib/env";
 import { llmChat } from "@/lib/llm/client";
-import { openRouterChat, OPENROUTER_REPORT_MODEL } from "@/lib/llm/openrouter";
+import { openRouterChat, getOpenRouterModel } from "@/lib/llm/openrouter";
 import { getPreviewSnapshot } from "@/lib/preview/data";
 import { PREVIEW_CLIENTS } from "@/lib/preview-clients";
 import {
@@ -286,7 +286,7 @@ ${safeOperatorKb ? `OPERATOR KNOWLEDGE BASE (sanitized):\n"""\n${safeOperatorKb}
 
     if (useOpenRouter) {
       const resp = await openRouterChat({
-        model: OPENROUTER_REPORT_MODEL,
+        model: getOpenRouterModel("positioning"),
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },

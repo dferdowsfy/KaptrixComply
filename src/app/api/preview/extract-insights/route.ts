@@ -14,7 +14,7 @@ import {
   getSelfHostedLlmModelForTask,
 } from "@/lib/env";
 import { llmChat } from "@/lib/llm/client";
-import { openRouterChat, OPENROUTER_REPORT_MODEL } from "@/lib/llm/openrouter";
+import { openRouterChat, getOpenRouterModel } from "@/lib/llm/openrouter";
 import { requireAuth, authErrorResponse } from "@/lib/security/authz";
 import type { KnowledgeInsight } from "@/components/documents/knowledge-insights-panel";
 
@@ -94,7 +94,7 @@ async function callLlm(
   }
   if (isOpenRouterConfigured()) {
     const result = await openRouterChat({
-      model: OPENROUTER_REPORT_MODEL,
+      model: getOpenRouterModel("extract"),
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },

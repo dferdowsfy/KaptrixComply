@@ -30,12 +30,11 @@ export interface VisionExtractArgs {
   timeoutMs?: number;
 }
 
-/** Default OpenRouter vision model — cheap Llama 3.2 Vision (11B).
- *  Roughly $0.055 / 1M input tokens + $0.055 / 1M output tokens at the
- *  time of writing, i.e. orders of magnitude cheaper than Claude 3.5
- *  Sonnet or GPT-4o. Operators can override per-request via `model`
- *  or globally via the OPENROUTER_VISION_MODEL env var. */
-const DEFAULT_OPENROUTER_VISION_MODEL = "meta-llama/llama-3.2-11b-vision-instruct";
+/** Default OpenRouter vision model — gemma-3-27b-it is multimodal, ZDR-capable,
+ *  and handles diagram / slide-to-markdown extraction well. Operators can
+ *  override per-request via `model`, via OPENROUTER_MODEL_VISION (preferred),
+ *  or via the legacy OPENROUTER_VISION_MODEL env var. */
+const DEFAULT_OPENROUTER_VISION_MODEL = "google/gemma-3-27b-it";
 
 /** Env var an operator can set to override the self-hosted vision model. */
 const SELF_HOSTED_VISION_MODEL_ENV = "SELF_HOSTED_LLM_VISION_MODEL";
@@ -54,7 +53,13 @@ export async function visionExtract(args: VisionExtractArgs): Promise<string> {
 
 async function visionViaOpenRouter(args: VisionExtractArgs): Promise<string> {
   const apiKey = getOpenRouterApiKey();
-  const envOverride = (process.env.OPENROUTER_VISION_MODEL ?? "").trim();
+  // Prefer the new unified env var; fall back to the legacy name; finally
+  // the module-level default.
+  const envOverride = (
+    process.env.OPENROUTER_MODEL_VISION ??
+    process.env.OPENROUTER_VISION_MODEL ??
+    ""
+  ).trim();
   const model = args.model ?? (envOverride || DEFAULT_OPENROUTER_VISION_MODEL);
 
   const body = {

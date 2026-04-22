@@ -85,6 +85,58 @@ export function getOpenRouterZeroRetention(): boolean {
   return true; // secure-by-default
 }
 
+/**
+ * Per-task OpenRouter model routing. Each task can be pointed at a
+ * different model via a Vercel env var, with a sensible ZDR default so
+ * the app works out of the box.
+ *
+ * Env var names and defaults:
+ *   OPENROUTER_MODEL_EXTRACT    → openai/gpt-oss-20b      (insight extraction from uploaded docs)
+ *   OPENROUTER_MODEL_SCORING    → openai/gpt-5-nano       (6-dimension scoring fan-out)
+ *   OPENROUTER_MODEL_REPORT     → openai/gpt-5-nano       (report generation)
+ *   OPENROUTER_MODEL_POSITIONING→ openai/gpt-5-nano       (positioning analysis)
+ *   OPENROUTER_MODEL_CHAT       → openai/gpt-oss-20b      (chat / Harvey assistant)
+ *   OPENROUTER_MODEL_GUIDANCE   → openai/gpt-oss-20b      (scoring guidance popups)
+ *   OPENROUTER_MODEL_VISION     → google/gemma-3-27b-it   (image / diagram OCR)
+ *   OPENROUTER_MODEL_DEFAULT    → openai/gpt-oss-20b      (fallback when a task var is unset)
+ */
+export type OpenRouterTask =
+  | "extract"
+  | "scoring"
+  | "report"
+  | "positioning"
+  | "chat"
+  | "guidance"
+  | "vision";
+
+const OPENROUTER_TASK_DEFAULTS: Record<OpenRouterTask, string> = {
+  extract: "openai/gpt-oss-20b",
+  scoring: "openai/gpt-5-nano",
+  report: "openai/gpt-5-nano",
+  positioning: "openai/gpt-5-nano",
+  chat: "openai/gpt-oss-20b",
+  guidance: "openai/gpt-oss-20b",
+  vision: "google/gemma-3-27b-it",
+};
+
+const OPENROUTER_TASK_ENV_KEY: Record<OpenRouterTask, string> = {
+  extract: "OPENROUTER_MODEL_EXTRACT",
+  scoring: "OPENROUTER_MODEL_SCORING",
+  report: "OPENROUTER_MODEL_REPORT",
+  positioning: "OPENROUTER_MODEL_POSITIONING",
+  chat: "OPENROUTER_MODEL_CHAT",
+  guidance: "OPENROUTER_MODEL_GUIDANCE",
+  vision: "OPENROUTER_MODEL_VISION",
+};
+
+export function getOpenRouterModelForTask(task: OpenRouterTask): string {
+  const specific = getServerEnv(OPENROUTER_TASK_ENV_KEY[task]);
+  if (specific && !isPlaceholder(specific)) return specific;
+  const fallback = getServerEnv("OPENROUTER_MODEL_DEFAULT");
+  if (fallback && !isPlaceholder(fallback)) return fallback;
+  return OPENROUTER_TASK_DEFAULTS[task];
+}
+
 export interface OpenRouterEnvDebugInfo {
   configured: boolean;
   present: boolean;

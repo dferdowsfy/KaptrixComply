@@ -6,7 +6,7 @@ import {
   isSelfHostedLlmConfigured,
 } from "@/lib/env";
 import {
-  OPENROUTER_REPORT_MODEL,
+  getOpenRouterModel,
   openRouterChat,
 } from "@/lib/llm/openrouter";
 import { getServiceClient } from "@/lib/supabase/service";
@@ -248,10 +248,9 @@ Answer:`;
     let usedModel: string;
 
     if (useOpenRouter) {
-      // OpenRouter primary path using the same Llama 3.3 70B class
-      // model family as report generation.
+      const chatModel = getOpenRouterModel("chat");
       const completion = await openRouterChat({
-        model: OPENROUTER_REPORT_MODEL,
+        model: chatModel,
         messages: [
           { role: "system", content: SYSTEM_INSTRUCTION },
           { role: "user", content: `EVIDENCE CONTEXT:\n"""\n${context}\n"""\n\n${history ? `RECENT CONVERSATION:\n${history}\n\n` : ""}USER QUESTION:\n${question}` },
@@ -260,7 +259,7 @@ Answer:`;
         maxTokens: 400,
       });
       answer = (completion.content ?? "").trim();
-      usedModel = OPENROUTER_REPORT_MODEL;
+      usedModel = chatModel;
     } else {
       // Fallback: self-hosted Ollama (slow on CPU, ~12 tok/s best case).
       const chatModel = getSelfHostedLlmModelForTask("chat");

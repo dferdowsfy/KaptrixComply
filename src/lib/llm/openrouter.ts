@@ -17,7 +17,12 @@
  * This can be disabled (NOT recommended) via OPENROUTER_ZERO_RETENTION=false.
  */
 
-import { getOpenRouterApiKey, getOpenRouterZeroRetention } from "@/lib/env";
+import {
+  getOpenRouterApiKey,
+  getOpenRouterZeroRetention,
+  getOpenRouterModelForTask,
+  type OpenRouterTask,
+} from "@/lib/env";
 
 export interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
@@ -39,8 +44,16 @@ export interface OpenRouterResult {
   finishReason: string | null;
 }
 
-/** Default model for report-class workloads: cheap, fast, 131K context. */
-export const OPENROUTER_REPORT_MODEL = "meta-llama/llama-3.3-70b-instruct";
+/**
+ * @deprecated Use getOpenRouterModel("report") instead. Kept for
+ * backward compatibility with existing imports.
+ */
+export const OPENROUTER_REPORT_MODEL = "openai/gpt-5-nano";
+
+/** Resolve the OpenRouter model slug for a given Kaptrix workload. */
+export function getOpenRouterModel(task: OpenRouterTask): string {
+  return getOpenRouterModelForTask(task);
+}
 
 export async function openRouterChat(
   opts: OpenRouterOptions,

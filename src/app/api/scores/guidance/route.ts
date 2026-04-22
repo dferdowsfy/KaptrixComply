@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { llmChat } from "@/lib/llm/client";
 import { isSelfHostedLlmConfigured, getSelfHostedLlmModelForTask, isOpenRouterConfigured } from "@/lib/env";
-import { openRouterChat, OPENROUTER_REPORT_MODEL } from "@/lib/llm/openrouter";
+import { openRouterChat, getOpenRouterModel } from "@/lib/llm/openrouter";
 import { SCORING_DIMENSIONS } from "@/lib/constants";
 import {
   SCORING_GUIDANCE_SYSTEM_PROMPT,
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     let guidanceModel: string;
 
     if (useOpenRouter) {
-      guidanceModel = OPENROUTER_REPORT_MODEL;
+      guidanceModel = getOpenRouterModel("guidance");
       const resp = await openRouterChat({
         model: guidanceModel,
         messages: [{ role: "user", content: prompt }],
