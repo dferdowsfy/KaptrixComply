@@ -160,18 +160,14 @@ export function IndustryCoverageMatrix({
   // Standalone JSX for the custom-artifact uploader. Rendered below the
   // coverage table.
   const customArtifactCard = (
-    <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/60 via-white to-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700">
-            Upload Artifact
-          </p>
-          <h3 className="mt-1 text-base font-semibold text-slate-900">
-            Upload a custom artifact
+          <h3 className="text-sm font-semibold text-slate-800">
+            Upload other artifact
           </h3>
-          <p className="mt-0.5 max-w-xl text-xs text-slate-600">
-            Anything outside the standard list — name it and we&apos;ll store
-            it in the knowledge base under that label.
+          <p className="mt-0.5 text-xs text-slate-500">
+            Anything outside the standard list — name it and we&apos;ll add it to the knowledge base.
           </p>
         </div>
       </div>
@@ -187,27 +183,27 @@ export function IndustryCoverageMatrix({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Name<span className="text-rose-500"> *</span>
+          <span className="text-[11px] font-medium text-slate-500">
+            Name<span className="text-rose-400"> *</span>
           </span>
           <input
             type="text"
             value={customName}
             onChange={(e) => setCustomName(e.target.value)}
             placeholder="e.g. Customer reference call notes"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Kind (optional)
+          <span className="text-[11px] font-medium text-slate-500">
+            Type
           </span>
           <select
             value={customKind}
             onChange={(e) => setCustomKind(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none"
           >
-            <option value="">Select a kind…</option>
+            <option value="">Select type…</option>
             <option value="evidence">Evidence / primary source</option>
             <option value="analysis">Analysis / write-up</option>
             <option value="contract">Contract / agreement</option>
@@ -222,9 +218,9 @@ export function IndustryCoverageMatrix({
             type="button"
             disabled={!clientId || !customCategory}
             onClick={handleCustomUploadClick}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
           >
-            Choose file & upload
+            Choose file
           </button>
         </div>
       </div>
@@ -236,8 +232,8 @@ export function IndustryCoverageMatrix({
         for (const d of custom) (byCat[d.category] ??= []).push(d);
         return (
           <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Custom artifacts in knowledge base
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+              Uploaded
             </p>
             {Object.entries(byCat).map(([cat, docs]) => {
               const label = cat
@@ -247,12 +243,10 @@ export function IndustryCoverageMatrix({
               return (
                 <div
                   key={cat}
-                  className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2"
+                  className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
                 >
-                  <p className="text-sm font-semibold text-slate-900">{label}</p>
-                  <p className="text-[11px] text-slate-500">
-                    <span className="font-mono uppercase tracking-wide">{cat}</span>
-                    {" · "}
+                  <p className="text-sm font-medium text-slate-800">{label}</p>
+                  <p className="text-[11px] text-slate-400">
                     {docs.length} file{docs.length > 1 ? "s" : ""}
                   </p>
                   <RowUploads uploads={docs} compact />
@@ -276,72 +270,8 @@ export function IndustryCoverageMatrix({
         className="sr-only"
         onChange={handleFileChange}
       />
-      {/* Primary CTA — missing required artifacts, above everything else. */}
-      {missingRequired.length > 0 && (
-        <div className="rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 p-5 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
-                Action required · {missingRequired.length} missing
-              </p>
-              <h3 className="mt-1 text-lg font-semibold text-amber-900">
-                Collect these {profile.label} artifacts to unlock scoring
-              </h3>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] font-semibold text-amber-800">
-              <span>{coveragePct}% coverage</span>
-              <div className="h-1.5 w-24 overflow-hidden rounded-full bg-amber-200">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
-                  style={{ width: `${coveragePct}%` }}
-                />
-              </div>
-            </div>
-          </div>
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {missingRequired.map((r) => {
-              const uploads = uploadsByCategory[r.artifact.category] ?? [];
-              const inFlight = uploads.some(
-                (u) =>
-                  u.parse_status === "uploading" ||
-                  u.parse_status === "parsing" ||
-                  u.parse_status === "queued",
-              );
-              return (
-                <li
-                  key={r.artifact.category}
-                  className="flex flex-col gap-1 rounded-lg border border-amber-200 bg-white/90 px-3 py-2"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="break-words text-sm font-semibold text-amber-900">
-                        {r.artifact.display_name}
-                      </p>
-                      <p className="break-words text-[11px] text-amber-700">
-                        <span className="font-mono uppercase tracking-wide">
-                          {r.artifact.category}
-                        </span>
-                        {" · "}
-                        {r.artifact.why_it_matters}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={!clientId || inFlight}
-                      onClick={() => triggerUpload(r.artifact.category)}
-                      className="shrink-0 rounded-full bg-amber-900 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-amber-900 transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {inFlight ? "Uploading…" : "Upload"}
-                    </button>
-                  </div>
-                  <RowUploads uploads={uploads} compact />
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
 
+      {/* 1. Stats summary — always at top */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
@@ -400,6 +330,70 @@ export function IndustryCoverageMatrix({
         </div>
       </div>
 
+      {/* 2. Subtle missing-artifacts prompt */}
+      {missingRequired.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-700">
+                {missingRequired.length}
+              </span>
+              <p className="text-sm font-medium text-slate-700">
+                {missingRequired.length} required artifact{missingRequired.length > 1 ? "s" : ""} missing for{" "}
+                <span className="font-semibold">{profile.label}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+              <span>{coveragePct}% coverage</span>
+              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
+                  style={{ width: `${coveragePct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {missingRequired.map((r) => {
+              const uploads = uploadsByCategory[r.artifact.category] ?? [];
+              const inFlight = uploads.some(
+                (u) =>
+                  u.parse_status === "uploading" ||
+                  u.parse_status === "parsing" ||
+                  u.parse_status === "queued",
+              );
+              return (
+                <li
+                  key={r.artifact.category}
+                  className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-sm font-medium text-slate-800">
+                        {r.artifact.display_name}
+                      </p>
+                      <p className="break-words text-[11px] text-slate-500">
+                        {r.artifact.why_it_matters}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!clientId || inFlight}
+                      onClick={() => triggerUpload(r.artifact.category)}
+                      className="shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {inFlight ? "Uploading…" : "Upload"}
+                    </button>
+                  </div>
+                  <RowUploads uploads={uploads} compact />
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* 3. Artifact table */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
         <table className="w-full">
           <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
@@ -521,7 +515,7 @@ export function IndustryCoverageMatrix({
         </table>
       </div>
 
-      {/* Custom artifact upload — below the coverage table */}
+      {/* 4. Upload other artifact — below table */}
       {customArtifactCard}
     </div>
   );
