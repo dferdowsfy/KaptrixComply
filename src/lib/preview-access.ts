@@ -11,9 +11,13 @@ export const ALWAYS_VISIBLE_PREVIEW_TABS: PreviewTabId[] = ["home", "overview"];
 export function resolvePreviewTabFromPath(pathname: string): PreviewTabId | null {
   if (!pathname) return null;
 
-  const normalized = pathname.startsWith("/preview")
-    ? pathname.replace(/^\/preview/, "/app")
-    : pathname;
+  // Normalize all three URL aliases to /app/* for matching.
+  let normalized = pathname;
+  if (normalized.startsWith("/preview")) {
+    normalized = normalized.replace(/^\/preview/, "/app");
+  } else if (normalized.startsWith("/demo")) {
+    normalized = normalized.replace(/^\/demo/, "/app");
+  }
 
   const match = PREVIEW_TABS.find((tab) => {
     if (tab.href === "/app") {

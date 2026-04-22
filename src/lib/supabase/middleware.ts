@@ -11,6 +11,7 @@ import {
 // back that workspace and must also be reachable anonymously.
 const PUBLIC_PATH_PREFIXES = [
   "/preview",
+  "/demo",
   "/app",
   "/login",
   "/account",
@@ -66,7 +67,7 @@ export async function updateSession(request: NextRequest) {
   // session is present — anonymous visitors see the full demo.
   const path = request.nextUrl.pathname;
   const isProtectedSurface =
-    path.startsWith("/app") || path.startsWith("/preview");
+    path.startsWith("/app") || path.startsWith("/preview") || path.startsWith("/demo");
   if (user && isProtectedSurface) {
     const { data: profile } = await supabase
       .from("users")
@@ -80,7 +81,7 @@ export async function updateSession(request: NextRequest) {
 
     if (isPreviewTabHidden(tabId, hiddenKeys)) {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = path.startsWith("/preview") ? "/preview" : "/app";
+      redirectUrl.pathname = path.startsWith("/preview") ? "/preview" : path.startsWith("/demo") ? "/demo" : "/app";
       redirectUrl.search = "";
       const redirectResponse = NextResponse.redirect(redirectUrl);
       supabaseResponse.cookies.getAll().forEach(({ name, value }) => {

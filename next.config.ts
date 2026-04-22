@@ -12,13 +12,17 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // URL aliasing: logged-in operators see clean /app/* paths while the
-  // route handlers still live under src/app/preview/*. Anonymous demo
-  // users hitting /preview/* continue to work unchanged.
+  // URL aliasing:
+  //   /app/*   — authenticated operators (clean URL)
+  //   /demo/*  — public demo surface (nicer than /preview)
+  //   /preview/* — legacy path, kept for backward compat
+  // All three rewrite to the same src/app/preview/* route handlers.
   async rewrites() {
     return [
       { source: "/app", destination: "/preview" },
       { source: "/app/:path*", destination: "/preview/:path*" },
+      { source: "/demo", destination: "/preview" },
+      { source: "/demo/:path*", destination: "/preview/:path*" },
     ];
   },
 };

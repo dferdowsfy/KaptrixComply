@@ -112,21 +112,27 @@ export function PreviewShell({
               <nav className="min-w-0 flex-1">
                 <ul className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   {visibleTabs.map((tab) => {
-                    // Both `/app/*` (rewritten) and `/preview/*` (direct)
-                    // resolve to the same pages. Match either so tabs
-                    // stay highlighted regardless of which URL the
-                    // operator arrived from.
-                    const normalized = pathname.startsWith("/preview")
-                      ? pathname.replace(/^\/preview/, "/app")
-                      : pathname;
+                    // Normalize /preview/* and /demo/* to /app/* so tab
+                    // highlighting works regardless of which URL alias
+                    // the user arrived from.
+                    let normalized = pathname;
+                    if (normalized.startsWith("/preview")) {
+                      normalized = normalized.replace(/^\/preview/, "/app");
+                    } else if (normalized.startsWith("/demo")) {
+                      normalized = normalized.replace(/^\/demo/, "/app");
+                    }
                     const isActive =
                       tab.href === "/app"
                         ? normalized === "/app"
                         : normalized.startsWith(tab.href);
+                    // Demo users get /demo/* links; authenticated users get /app/*.
+                    const href = isDemo
+                      ? tab.href.replace(/^\/app/, "/demo")
+                      : tab.href;
                     return (
                       <li key={tab.id}>
                         <Link
-                          href={tab.href}
+                          href={href}
                           className={`inline-flex whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition ${
                             isActive
                               ? "bg-slate-900 text-white shadow-sm"
