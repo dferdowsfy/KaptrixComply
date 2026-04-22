@@ -90,10 +90,19 @@ function buildContextFromSnapshot(
     parts.push(
       `[document] ${d.filename} (${d.category}, status: ${d.parse_status})`,
     );
+    // Include parsed text for uploaded artifacts (PDF / PPTX / DOCX /
+    // XLSX / image-via-vision) so the assistant can actually answer
+    // questions about the content, not just the filename. Cap per-doc
+    // so a single huge deck can't crowd out the rest of the evidence.
+    if (d.parsed_text && d.parsed_text.trim()) {
+      const body = d.parsed_text.slice(0, 12_000).trim();
+      parts.push(`[document-content · ${d.filename}]\n${body}`);
+    }
   });
-  // Keep context compact for the 3B chat model — large prompts cause
-  // enormous CPU prompt-processing time with diminishing returns.
-  return parts.join("\n").slice(0, 16_000);
+  // Cap snapshot-derived context at 48k chars. Uploaded-doc bodies
+  // arrive embedded above; caller context + knowledge_base are merged
+  // downstream.
+  return parts.join("\n").slice(0, 48_000);
 }
 
 async function persistTurn(args: {
@@ -186,30 +195,38 @@ export async function POST(req: Request) {
   const sessionId = (body.session_id ?? "").trim() || `anon-${Date.now()}`;
   const clientId = (body.client_id ?? "").trim() || null;
 
-  // Build context: prefer server-side Supabase snapshot when a client_id
-  // is provided; fall back to caller-supplied evidence string for
-  // backwards compatibility with older chatbot clients.
-  let context = (body.context ?? "").slice(0, 16_000);
+  // Build context. Unlike the previous implementation, we MERGE the
+  // caller-supplied evidence with the Supabase snapshot instead of
+  // overwriting. Preview uploads (PDF / PPTX / images) are parsed
+  // client-side and live in localStorage — their text only reaches the
+  // server via the `context` / `knowledge_base` fields the client
+  // sends. Discarding the caller context meant uploaded decks were
+  // effectively invisible to the assistant.
+  const callerContext = (body.context ?? "").slice(0, 48_000);
+  let snapshotContext = "";
   if (clientId) {
     try {
       const snapshot = await getPreviewSnapshot(clientId);
-      context = buildContextFromSnapshot(snapshot);
+      snapshotContext = buildContextFromSnapshot(snapshot);
     } catch {
-      // keep caller-provided context as fallback
+      // no snapshot — keep going with caller context only
     }
   }
 
-  // Always append the client-submitted knowledge base (intake, coverage,
-  // insights, pre-analysis) so operator-submitted context is available
-  // to the model regardless of whether we built context from Supabase
-  // or the caller string.
-  const kbText = (body.knowledge_base ?? "").slice(0, 6_000);
-  if (kbText) {
-    context = `${context}\n\n--- OPERATOR-SUBMITTED KNOWLEDGE BASE ---\n${kbText}`.slice(
-      0,
-      20_000,
-    );
-  }
+  // Always include the client-submitted knowledge base (intake, coverage,
+  // insights, pre-analysis, uploaded document text) so operator-submitted
+  // context is available to the model. Uploaded-doc bodies can be large
+  // (full pitch deck text), so allow up to 24k chars here.
+  const kbText = (body.knowledge_base ?? "").slice(0, 24_000);
+
+  let context = [
+    snapshotContext,
+    callerContext && `--- CLIENT-ASSEMBLED EVIDENCE ---\n${callerContext}`,
+    kbText && `--- OPERATOR-SUBMITTED KNOWLEDGE BASE ---\n${kbText}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, 64_000);
 
   const useOpenRouter = isOpenRouterConfigured();
   if (!useOpenRouter && !isSelfHostedLlmConfigured()) {

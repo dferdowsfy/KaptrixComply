@@ -108,10 +108,14 @@ export function removeUploadedDoc(clientId: string, id: string): void {
   writeStore(store);
 }
 
-/** Build compact evidence lines for the chat knowledge_base payload. */
+/** Build evidence lines for the chat / scoring / report knowledge_base
+ *  payload. Per-doc budget defaults generous enough to fit a multi-slide
+ *  pitch deck's full parsed text so the assistant can actually cite it
+ *  instead of ending mid-slide. Total cap keeps the prompt bounded. */
 export function formatUploadedDocsEvidence(
   clientId: string | null | undefined,
-  maxTotalChars = 6_000,
+  maxTotalChars = 40_000,
+  maxPerDocChars = 12_000,
 ): string[] {
   const docs = readUploadedDocs(clientId);
   const lines: string[] = [];
@@ -119,10 +123,9 @@ export function formatUploadedDocsEvidence(
   for (const d of docs) {
     if (!d.parsed_text) continue;
     const header = `[uploaded · ${d.filename} · ${d.category}]`;
-    // Cap each doc to keep context balanced across multiple uploads.
     const remaining = Math.max(0, maxTotalChars - used);
-    if (remaining <= header.length + 32) break;
-    const perDocBudget = Math.min(1_800, remaining - header.length - 1);
+    if (remaining <= header.length + 64) break;
+    const perDocBudget = Math.min(maxPerDocChars, remaining - header.length - 1);
     const body = d.parsed_text.slice(0, perDocBudget).trim();
     const line = `${header}\n${body}`;
     lines.push(line);

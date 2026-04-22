@@ -148,6 +148,12 @@ export function uploadAndParse(file: File, meta: UploadedDoc): Promise<void> {
 
     const form = new FormData();
     form.append("file", file);
+    // Persistence metadata — tells /api/preview/parse to write the
+    // parsed text into the preview_uploaded_docs Supabase table so the
+    // server-side retrieval layer (chat/scoring/reports) can see it.
+    if (meta.client_id) form.append("client_id", meta.client_id);
+    form.append("doc_id", meta.id);
+    form.append("category", meta.category);
     xhr.send(form);
   });
 }

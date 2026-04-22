@@ -317,27 +317,67 @@ export async function getPreviewSnapshot(
     .eq("client_id", clientId)
     .maybeSingle();
 
-  if (!error && data?.payload) return data.payload as PreviewSnapshot;
-
-  // No snapshot found. If this id is a seeded preview mock, use the demo.
-  if (
+  let snapshot: PreviewSnapshot;
+  if (!error && data?.payload) {
+    snapshot = data.payload as PreviewSnapshot;
+  } else if (
     clientId === DEFAULT_PREVIEW_CLIENT_ID ||
     PREVIEW_CLIENTS.some((c) => c.id === clientId)
   ) {
-    return fallbackSnapshot(clientId);
+    snapshot = fallbackSnapshot(clientId);
+  } else {
+    // User-created engagement — pull the row if it exists.
+    const { data: row } = await supabase
+      .from("engagements")
+      .select("*")
+      .eq("id", clientId)
+      .maybeSingle();
+    snapshot = row
+      ? blankSnapshotFor(row as Engagement)
+      : blankSnapshotFor(engagementShellFor(clientId));
   }
 
-  // Otherwise it's a user-created engagement — return a blank snapshot
-  // populated with the real engagement row if we can find it.
-  const { data: row } = await supabase
-    .from("engagements")
-    .select("*")
-    .eq("id", clientId)
-    .maybeSingle();
+  // Merge any operator-uploaded artifacts persisted via /api/preview/parse
+  // into snapshot.documents so every server-side consumer (chat context
+  // builder, scoring, reporting) sees the uploaded deck/PDF/image text
+  // without depending on client-side localStorage.
+  try {
+    const { data: uploaded } = await supabase
+      .from("preview_uploaded_docs")
+      .select(
+        "id, filename, category, mime_type, file_size_bytes, parsed_text, token_count, parse_status, parse_error, uploaded_at",
+      )
+      .eq("client_id", clientId)
+      .order("uploaded_at", { ascending: false });
 
-  if (row) {
-    return blankSnapshotFor(row as Engagement);
+    if (uploaded && uploaded.length > 0) {
+      const existingIds = new Set(snapshot.documents.map((d) => d.id));
+      const extraDocs: Document[] = uploaded
+        .filter((u) => !existingIds.has(u.id))
+        .map((u) => ({
+          id: u.id,
+          engagement_id: snapshot.engagement.id,
+          category: u.category as Document["category"],
+          filename: u.filename,
+          storage_path: "",
+          file_size_bytes: u.file_size_bytes ?? 0,
+          mime_type: u.mime_type ?? "application/octet-stream",
+          uploaded_at: u.uploaded_at,
+          uploaded_by: null,
+          parsed_text: u.parsed_text ?? null,
+          parse_status: (u.parse_status as Document["parse_status"]) ?? "parsed",
+          parse_error: u.parse_error ?? null,
+          token_count: u.token_count ?? null,
+        }));
+      snapshot = {
+        ...snapshot,
+        documents: [...extraDocs, ...snapshot.documents],
+      };
+    }
+  } catch {
+    // Non-fatal — a missing preview_uploaded_docs table just means no
+    // persisted uploads to merge.
   }
 
-  return blankSnapshotFor(engagementShellFor(clientId));
+  return snapshot;
 }

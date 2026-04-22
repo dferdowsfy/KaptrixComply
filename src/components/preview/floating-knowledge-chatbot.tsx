@@ -24,6 +24,11 @@ import {
   subscribeUploadedDocs,
   type UploadedDoc,
 } from "@/lib/preview/uploaded-docs";
+import {
+  readExtractedInsights,
+  subscribeExtractedInsights,
+} from "@/lib/preview/extracted-insights";
+import type { KnowledgeInsight } from "@/components/documents/knowledge-insights-panel";
 import { useChatPanel } from "@/components/preview/chat-panel-context";
 import { ChatMarkdown } from "@/components/preview/chat-markdown";
 
@@ -87,6 +92,16 @@ export function KnowledgeChatPanel() {
     subscribeUploadedDocs,
     () => readUploadedDocs(selectedId),
     () => [] as readonly UploadedDoc[],
+  );
+
+  // LLM-extracted KnowledgeInsights from uploaded documents (separate
+  // from the demo snapshot's knowledgeInsights). These are produced by
+  // /api/preview/extract-insights after every upload and must flow
+  // into the chat corpus so the assistant can cite them.
+  const extractedInsights = useSyncExternalStore(
+    subscribeExtractedInsights,
+    () => readExtractedInsights(selectedId),
+    () => [] as KnowledgeInsight[],
   );
 
   useEffect(() => {
@@ -189,24 +204,40 @@ export function KnowledgeChatPanel() {
     // Operator-uploaded documents that were parsed through the real
     // parser stack (including vision for images). Surface each as a
     // citable evidence chunk so the chat assistant can quote them.
+    // Include docs in the post-parse "extracting" phase too — their
+    // text is already available and the user expects the chatbot to
+    // see the deck the instant it finishes parsing, not after the
+    // secondary insight-extraction pass completes.
     const fromUploaded: KnowledgeChunk[] = uploadedDocs
-      .filter((d) => d.parse_status === "parsed" && d.parsed_text)
+      .filter(
+        (d) =>
+          (d.parse_status === "parsed" || d.parse_status === "extracting") &&
+          d.parsed_text,
+      )
       .map((d) => ({
         id: `upload-${d.id}`,
         source: `uploaded · ${d.filename}`,
-        text: (d.parsed_text ?? "").slice(0, 4_000),
+        text: (d.parsed_text ?? "").slice(0, 12_000),
       }));
+
+    // LLM-extracted diligence insights from uploaded documents.
+    const fromExtracted: KnowledgeChunk[] = extractedInsights.map((i) => ({
+      id: `extracted-${i.id}`,
+      source: `extracted · ${i.source_document}`,
+      text: `${i.insight} — "${i.excerpt}" (${i.category}, ${i.confidence} confidence)`,
+    }));
 
     return [
       ...fromKb,
       ...fromUploaded,
+      ...fromExtracted,
       ...fromInsights,
       ...fromAnalysis,
       ...fromReport,
       ...fromScores,
       ...fromDocs,
     ];
-  }, [snapshot, kb, uploadedDocs]);
+  }, [snapshot, kb, uploadedDocs, extractedInsights]);
 
   const ask = async (raw: string) => {
     const question = raw.trim();
@@ -250,7 +281,15 @@ export function KnowledgeChatPanel() {
           ),
         ),
       ),
-      ...formatUploadedDocsEvidence(selectedId),
+      // Uploaded documents (PDF / PPTX / DOCX / XLSX / image-via-vision)
+      // parsed text. Use a generous per-doc budget so a full pitch deck
+      // fits instead of being truncated after the first slide or two.
+      ...formatUploadedDocsEvidence(selectedId, 24_000, 12_000),
+      // LLM-extracted diligence insights from uploaded documents.
+      ...extractedInsights.map(
+        (i) =>
+          `[extracted-insight · ${i.category} · ${i.confidence}] ${i.insight} (source: ${i.source_document})`,
+      ),
     ].join("\n");
 
     let answerText = "";
