@@ -1095,76 +1095,69 @@ export function IntakeQuestionnaire({
 
   return (
     <div className="space-y-6">
-      {/* Top summary bar */}
-      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-indigo-600">
-              Industry context
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {profile.label}
-            </p>
-            <p className="text-sm text-slate-600">{profile.tagline}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-slate-700">Profile</label>
-            <div
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm"
-              title="Profile is set at client creation and locked for the lifetime of the engagement."
-              aria-label="Industry profile (locked)"
+      {/* Compact top summary bar */}
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* Profile (locked) */}
+          <div
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-semibold text-slate-900"
+            title="Industry profile is locked at client creation."
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="h-3.5 w-3.5 text-slate-500"
+              aria-hidden="true"
             >
-              <span>{profile.label}</span>
-              <span className="flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="h-3 w-3"
-                  aria-hidden="true"
+              <path
+                fillRule="evenodd"
+                d="M10 1a4 4 0 0 0-4 4v3H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1V5a4 4 0 0 0-4-4Zm2 7V5a2 2 0 1 0-4 0v3h4Z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span>{profile.label}</span>
+          </div>
+
+          {/* Risks — compact inline pills */}
+          {profile.typical_risks.length > 0 && (
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {profile.typical_risks.slice(0, 3).map((risk) => (
+                <span
+                  key={risk}
+                  className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900"
                 >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 1a4 4 0 0 0-4 4v3H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1V5a4 4 0 0 0-4-4Zm2 7V5a2 2 0 1 0-4 0v3h4Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Locked
-              </span>
+                  {risk}
+                </span>
+              ))}
+              {profile.typical_risks.length > 3 && (
+                <span
+                  className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+                  title={profile.typical_risks.slice(3).join(" · ")}
+                >
+                  +{profile.typical_risks.length - 3} more
+                </span>
+              )}
             </div>
-          </div>
-        </div>
+          )}
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {profile.typical_risks.map((risk) => (
-            <span
-              key={risk}
-              className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900"
-            >
-              {risk}
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              {answered} of {questions.length} questions complete
+          {/* Progress — pushes to the right on wide screens */}
+          <div className="ml-auto flex items-center gap-3">
+            <p className="text-[12px] font-medium text-slate-700">
+              <span className="font-semibold text-slate-900">
+                {answered}/{questions.length}
+              </span>{" "}
+              answered
             </p>
-            <p className="text-xs text-slate-500">
-              Answers save automatically. Navigate sections on the left.
-            </p>
-          </div>
-          <div className="w-48">
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 sm:w-32">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-indigo-700 transition-all"
                 style={{ width: `${completionPct}%` }}
               />
             </div>
-            <p className="mt-1 text-right text-xs font-semibold text-slate-600">
+            <span className="text-[12px] font-semibold tabular-nums text-slate-700">
               {completionPct}%
-            </p>
+            </span>
           </div>
         </div>
       </div>

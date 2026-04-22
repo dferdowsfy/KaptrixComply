@@ -218,8 +218,8 @@ export default function PreviewIntakePage() {
     <div className="space-y-4">
       <SectionHeader
         eyebrow="Module 1"
-        title="Guided intake questionnaire"
-        description="Comprehensive intake with industry-specific depth, preselected options, and optional free-form context at each prompt to build stronger platform intelligence."
+        title="Guided intake"
+        description="Answers save automatically. Navigate sections on the left."
       />
       <IntakeQuestionnaire
         key={`${selectedId}:${hydrateToken}`}

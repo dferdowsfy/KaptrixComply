@@ -73,10 +73,36 @@ const CONFIDENCE_STYLES: Record<Confidence, string> = {
   low: "bg-rose-50 text-rose-700 ring-rose-200",
 };
 
+// ─── Local cache so returning users see prior analysis without a reload ─────
+const POS_CACHE_PREFIX = "kaptrix.preview.positioning.v1:";
+type PositioningCache = {
+  data: Positioning;
+  sources: { url: string; title?: string }[];
+  generated_at: string;
+};
+function readPositioningCache(clientId: string | null | undefined): PositioningCache | null {
+  if (!clientId || typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(POS_CACHE_PREFIX + clientId);
+    return raw ? (JSON.parse(raw) as PositioningCache) : null;
+  } catch {
+    return null;
+  }
+}
+function writePositioningCache(clientId: string, cache: PositioningCache): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(POS_CACHE_PREFIX + clientId, JSON.stringify(cache));
+  } catch {
+    /* ignore quota */
+  }
+}
+
 export default function PositioningPage() {
   const { client, selectedId } = useSelectedPreviewClient();
   const [data, setData] = useState<Positioning | null>(null);
   const [sources, setSources] = useState<{ url: string; title?: string }[]>([]);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,7 +134,14 @@ export default function PositioningPage() {
       } else {
         setData(json.positioning);
         setSources(json.sources ?? []);
+        const ts = new Date().toISOString();
+        setGeneratedAt(ts);
         if (selectedId) {
+          writePositioningCache(selectedId, {
+            data: json.positioning,
+            sources: json.sources ?? [],
+            generated_at: ts,
+          });
           submitPositioningToKnowledgeBase({
             clientId: selectedId,
             positioning: json.positioning,
@@ -123,11 +156,20 @@ export default function PositioningPage() {
     }
   }, [selectedId, kb]);
 
-  // Auto-run when client changes
+  // On client change: restore prior results from cache immediately so the
+  // page never looks empty. Only auto-run the API when we have nothing cached.
   useEffect(() => {
+    setError(null);
+    const cached = readPositioningCache(selectedId);
+    if (cached) {
+      setData(cached.data);
+      setSources(cached.sources);
+      setGeneratedAt(cached.generated_at);
+      return;
+    }
     setData(null);
     setSources([]);
-    setError(null);
+    setGeneratedAt(null);
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
@@ -151,6 +193,11 @@ export default function PositioningPage() {
           <p className="text-xs text-slate-500">
             {client.client} · {client.industry} · {client.deal_stage}
           </p>
+          {generatedAt && !loading && (
+            <p className="mt-1 text-[11px] text-slate-400">
+              Last generated {new Date(generatedAt).toLocaleString()}
+            </p>
+          )}
         </div>
         <button
           type="button"

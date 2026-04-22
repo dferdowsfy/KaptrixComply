@@ -99,8 +99,12 @@ export function useSystemSignals(clientId: string | null | undefined): UseSystem
             // Severity escalated — surface as "updated"
             deduped.push({ ...change, lifecycle: "updated" });
             seenRef.current.set(change.id, { severity: change.severity, headline: change.headline });
+          } else if (change.headline !== prior.headline) {
+            // Content changed (e.g. new priority added, new finding) — surface as "updated"
+            deduped.push({ ...change, lifecycle: "updated" });
+            seenRef.current.set(change.id, { severity: change.severity, headline: change.headline });
           }
-          // Otherwise: same or lower severity → suppress (already seen)
+          // Otherwise: identical fingerprint → suppress
         }
       }
 

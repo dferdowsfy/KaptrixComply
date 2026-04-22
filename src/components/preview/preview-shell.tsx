@@ -139,20 +139,6 @@ export function PreviewShell({
                   </span>
                   Ask AI
                 </button>
-                <Link
-                  href="/how-it-works"
-                  className="group relative hidden items-center rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-indigo-700 transition sm:inline-flex"
-                >
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-100/60 via-white to-indigo-100/60 opacity-0 blur-sm transition group-hover:opacity-100"
-                  />
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 rounded-full ring-1 ring-inset ring-indigo-200/70 transition group-hover:ring-indigo-400/80"
-                  />
-                  <span className="relative">How it works</span>
-                </Link>
                 <NavSettingsMenu />
               </div>
             </div>

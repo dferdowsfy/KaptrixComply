@@ -174,12 +174,12 @@ export function IndustryCoverageMatrix({
                   key={r.artifact.category}
                   className="flex flex-col gap-1 rounded-lg border border-amber-200 bg-white/90 px-3 py-2"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-amber-900">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-sm font-semibold text-amber-900">
                         {r.artifact.display_name}
                       </p>
-                      <p className="truncate text-[11px] text-amber-700">
+                      <p className="break-words text-[11px] text-amber-700">
                         <span className="font-mono uppercase tracking-wide">
                           {r.artifact.category}
                         </span>

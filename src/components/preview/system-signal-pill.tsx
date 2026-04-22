@@ -200,7 +200,7 @@ function BatchBody({
 
   return (
     <div className="space-y-3">
-      {!compact && (
+      {!compact && shouldShowNetImpact(batch) && (
         <NetImpactBlock impact={batch.netImpact} />
       )}
 
@@ -385,6 +385,16 @@ function ConfidenceBlock({ shift }: { shift: ConfidenceShift }) {
 }
 
 // ─── Net impact block ─────────────────────────────────────────────────────────
+/** Hide the "Mixed" indicator when there's no actionable directional signal — otherwise it reads as noise. */
+function shouldShowNetImpact(batch: KeyChangesBatch): boolean {
+  if (batch.netImpact.direction !== "mixed") return true;
+  if (batch.confidenceShift) return true;
+  const hasRiskOrGap = batch.changes.some(
+    (c) => c.category === "risk" || c.category === "gap" || c.lifecycle === "resolved",
+  );
+  return hasRiskOrGap;
+}
+
 function NetImpactBlock({ impact }: { impact: NetImpact }) {
   const { direction, confidence, note } = impact;
   const label =
