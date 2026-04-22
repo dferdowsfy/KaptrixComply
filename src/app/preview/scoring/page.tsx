@@ -121,6 +121,24 @@ export default function PreviewScoringPage() {
         analyses={analyses}
         contextSignals={contextSignals}
         previewMode
+        scoringStale={scoringDirty.dirty}
+        onForceResync={() => {
+          // Force-resync: the ScoringPanel's onScoresChange effect will
+          // fire on the next render and write a fresh scoring KB entry.
+          // We just need to trigger a re-render by bumping the KB's
+          // scoring entry (clear its stale flag). The simplest path is
+          // to call submitScoringToKnowledgeBase with the current state.
+          // The panel's effect will immediately overwrite with accurate
+          // composite values on the next tick.
+          if (!selectedId) return;
+          submitScoringToKnowledgeBase({
+            clientId: selectedId,
+            scores: [],
+            composite_score: 0,
+            context_aware_composite: 0,
+            decision_band: null,
+          });
+        }}
         onScoresChange={(snap) => {
           if (!selectedId) return;
           submitScoringToKnowledgeBase({

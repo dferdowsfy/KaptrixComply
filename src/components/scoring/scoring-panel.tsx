@@ -43,6 +43,10 @@ interface Props {
     context_aware_composite: number;
     decision_band: string | null;
   }) => void;
+  /** Optional callback to force-refresh the scoring KB entry. */
+  onForceResync?: () => void;
+  /** Whether the scoring KB entry is stale and needs recompute. */
+  scoringStale?: boolean;
 }
 
 export function ScoringPanel({
@@ -57,6 +61,8 @@ export function ScoringPanel({
   priorComposite = null,
   contextSignals = [],
   onScoresChange,
+  onForceResync,
+  scoringStale = false,
 }: Props) {
   const [scores, setScores] = useState<Score[]>(initialScores);
   const [expandedDimension, setExpandedDimension] = useState<ScoreDimension | null>(
@@ -248,9 +254,20 @@ export function ScoringPanel({
             <span className="text-xs text-gray-400">Saving…</span>
           )}
           {previewMode && (
-            <span className="text-xs text-gray-400">
-              Preview mode — edits are local only
-            </span>
+            <div className="flex items-center gap-3">
+              {scoringStale && onForceResync && (
+                <button
+                  type="button"
+                  onClick={onForceResync}
+                  className="rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow transition hover:from-indigo-500 hover:to-violet-500"
+                >
+                  Re-run scoring
+                </button>
+              )}
+              <span className="text-xs text-gray-400">
+                Preview mode — edits are local only
+              </span>
+            </div>
           )}
         </div>
 
@@ -361,6 +378,7 @@ export function ScoringPanel({
                     initialRationale={existing?.operator_rationale ?? ""}
                     onSave={saveScore}
                     onScoreChange={updateLocalScore}
+                    contextSignals={contextSignals}
                   />
                 );
               })}
@@ -388,6 +406,7 @@ function SubCriterionInput({
   initialRationale,
   onSave,
   onScoreChange,
+  contextSignals = [],
 }: {
   dimension: string;
   subKey: string;
@@ -407,10 +426,23 @@ function SubCriterionInput({
     sub_criterion: string,
     score: number,
   ) => void;
+  contextSignals?: ContextSignal[];
 }) {
   const [score, setScore] = useState(initialScore);
   const [rationale, setRationale] = useState(initialRationale);
   const activeBand = getActiveBand(scoreBands, score);
+
+  // Build a contextual placeholder that tells the operator exactly
+  // what evidence or concern is influencing THIS criterion, instead
+  // of the generic "Operator rationale (minimum 2 sentences)…"
+  const relevantSignals = contextSignals.filter(
+    (s) => s.dimension === dimension,
+  );
+  const placeholder = relevantSignals.length > 0
+    ? `Context: ${relevantSignals.map((s) => s.reason).join("; ")}. — Explain whether you agree and cite the relevant evidence.`
+    : activeBand
+      ? `Score ${score.toFixed(1)} → "${activeBand.label}": ${activeBand.description} — Cite the evidence that justifies this level.`
+      : "Operator rationale (minimum 2 sentences)…";
 
   const bandColor =
     score <= 1
@@ -474,7 +506,7 @@ function SubCriterionInput({
             onSave(dimension, subKey, score, rationale);
           }
         }}
-        placeholder="Operator rationale (minimum 2 sentences)…"
+        placeholder={placeholder}
         rows={2}
         className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
       />
