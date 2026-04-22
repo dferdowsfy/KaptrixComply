@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { SectionHeader } from "@/components/preview/preview-shell";
 import {
   KnowledgeInsightsPanel,
@@ -18,6 +18,10 @@ import {
 } from "@/lib/preview/knowledge-base";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import { usePreviewSnapshot } from "@/hooks/use-preview-data";
+import {
+  readExtractedInsights,
+  subscribeExtractedInsights,
+} from "@/lib/preview/extracted-insights";
 
 const REMOVED_STORAGE_PREFIX = "kaptrix.preview.insights.removed:";
 
@@ -45,7 +49,24 @@ export default function PreviewInsightsPage() {
   const { selectedId } = useSelectedPreviewClient();
   const { snapshot } = usePreviewSnapshot(selectedId);
   const documents = snapshot?.documents ?? demoDocuments;
-  const allInsights = snapshot?.knowledgeInsights ?? demoKnowledgeInsights;
+
+  // Pre-seeded snapshot insights (demo or real engagement).
+  const snapshotInsights = snapshot?.knowledgeInsights ?? demoKnowledgeInsights;
+
+  // Live-updating extracted insights from uploaded documents.
+  const extractedInsights = useSyncExternalStore(
+    subscribeExtractedInsights,
+    () => readExtractedInsights(selectedId),
+    () => [] as KnowledgeInsight[],
+  );
+
+  // Merge: snapshot first, then any newly extracted insights not already
+  // present (de-duplicated by id so we never show the same insight twice).
+  const allInsights = useMemo(() => {
+    const seen = new Set(snapshotInsights.map((i) => i.id));
+    const novel = extractedInsights.filter((i) => !seen.has(i.id));
+    return [...snapshotInsights, ...novel];
+  }, [snapshotInsights, extractedInsights]);
 
   const [removedIds, setRemovedIds] = useState<Set<string>>(() =>
     readRemovedIds(selectedId ?? null),

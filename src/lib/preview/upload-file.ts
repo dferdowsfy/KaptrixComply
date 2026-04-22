@@ -4,6 +4,7 @@ import {
   upsertUploadedDoc,
   type UploadedDoc,
 } from "@/lib/preview/uploaded-docs";
+import { mergeExtractedInsights } from "@/lib/preview/extracted-insights";
 
 /**
  * Upload a single file to /api/preview/parse with real progress
@@ -87,6 +88,34 @@ export function uploadAndParse(file: File, meta: UploadedDoc): Promise<void> {
           token_count: parsed.tokenCount,
           upload_percent: 100,
         });
+
+        // Background: run LLM insight extraction on the parsed text.
+        // Fire-and-forget — never blocks the upload completion.
+        const parsedText = (parsed.text ?? "").trim();
+        if (parsedText && meta.client_id) {
+          const clientId = meta.client_id;
+          void fetch("/api/preview/extract-insights", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: meta.filename,
+              category: meta.category,
+              text: parsedText,
+            }),
+          })
+            .then(async (res) => {
+              if (!res.ok) return;
+              const data = (await res.json()) as {
+                insights?: import("@/components/documents/knowledge-insights-panel").KnowledgeInsight[];
+              };
+              if (Array.isArray(data.insights) && data.insights.length > 0) {
+                mergeExtractedInsights(clientId, data.insights);
+              }
+            })
+            .catch(() => {
+              // Extraction is best-effort; silently ignore errors.
+            });
+        }
       } finally {
         resolve();
       }
