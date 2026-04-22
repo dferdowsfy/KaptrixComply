@@ -21,10 +21,12 @@ export function PreviewShell({
   children,
   chatPanel,
   initialServerHidden,
+  isDemo = false,
 }: {
   children: React.ReactNode;
   chatPanel?: React.ReactNode;
   initialServerHidden?: NavTabId[];
+  isDemo?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -139,6 +141,15 @@ export function PreviewShell({
                 </ul>
               </nav>
               <div className="flex shrink-0 items-center gap-2">
+                {isDemo && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                    </span>
+                    Demo
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => chatCtx.setOpen((o) => !o)}

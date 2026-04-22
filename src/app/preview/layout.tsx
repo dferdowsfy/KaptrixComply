@@ -24,22 +24,28 @@ export const dynamic = "force-dynamic";
 //      can redirect away from a hidden route without waiting for a client
 //      fetch.
 // ---------------------------------------------------------------------------
-async function loadServerHidden(): Promise<PreviewTabId[]> {
+async function loadServerContext(): Promise<{
+  serverHidden: PreviewTabId[];
+  isDemo: boolean;
+}> {
   try {
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return [];
+    if (!user) return { serverHidden: [], isDemo: true };
     const { data } = await supabase
       .from("users")
       .select("hidden_menu_keys")
       .eq("id", user.id)
       .maybeSingle();
     const keys = (data?.hidden_menu_keys as string[] | null) ?? [];
-    return keys.filter((k): k is PreviewTabId => typeof k === "string");
+    return {
+      serverHidden: keys.filter((k): k is PreviewTabId => typeof k === "string"),
+      isDemo: false,
+    };
   } catch {
-    return [];
+    return { serverHidden: [], isDemo: true };
   }
 }
 
@@ -48,7 +54,7 @@ export default async function PreviewLayout({
 }: {
   children: ReactNode;
 }) {
-  const serverHidden = await loadServerHidden();
+  const { serverHidden, isDemo } = await loadServerContext();
 
   // Server-side enforcement: if the current route maps to a hidden tab,
   // refuse to render the page tree at all. Middleware already redirects,
@@ -75,6 +81,7 @@ export default async function PreviewLayout({
       <PreviewShell
         chatPanel={<KnowledgeChatPanel />}
         initialServerHidden={serverHidden}
+        isDemo={isDemo}
       >
         {children}
       </PreviewShell>
