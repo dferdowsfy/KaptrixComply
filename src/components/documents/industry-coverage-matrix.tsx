@@ -619,21 +619,21 @@ function RowUploads({
                 <button
                   type="button"
                   aria-label={`Remove ${d.filename}`}
-                  title="Remove file"
                   onClick={(e) => {
                     e.stopPropagation();
                     removeUploadedDoc(clientId, d.id);
                   }}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 transition hover:border-rose-400 hover:bg-rose-100"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 20 20"
                     fill="currentColor"
-                    className="h-3.5 w-3.5"
+                    className="h-3 w-3"
                   >
                     <path d="M7.5 3a1 1 0 0 0-1 1v1H4a1 1 0 1 0 0 2h.3l.7 9.3A2 2 0 0 0 7 18h6a2 2 0 0 0 2-1.7l.7-9.3H16a1 1 0 1 0 0-2h-2.5V4a1 1 0 0 0-1-1h-5zm1 2V4h3v1h-3zM7 8a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V9a1 1 0 0 1 1-1zm3 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V9a1 1 0 0 1 1-1zm3 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V9a1 1 0 0 1 1-1z" />
                   </svg>
+                  Remove
                 </button>
               )}
             </div>

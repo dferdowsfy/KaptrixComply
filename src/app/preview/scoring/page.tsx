@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { SectionHeader } from "@/components/preview/preview-shell";
 import { ScoringPanel } from "@/components/scoring/scoring-panel";
 import {
@@ -174,6 +174,15 @@ export default function PreviewScoringPage() {
     scoreCache?.inputs_signature !== undefined &&
     scoreCache.inputs_signature !== currentInputsSignature;
 
+  // Prevent the "score run done" effect from re-firing when KB updates
+  // (e.g. submitScoringToKnowledgeBase) change currentInputsSignature.
+  const processedRunKeyRef = useRef<string | null>(null);
+  // Reset the guard whenever the selected client changes so a fresh run
+  // for the same client after navigation is always processed.
+  useEffect(() => {
+    processedRunKeyRef.current = null;
+  }, [selectedId]);
+
   const run = useCallback(() => {
     if (!selectedId) return;
     // Compose the full scoring context: structured KB payloads +
@@ -216,6 +225,12 @@ export default function PreviewScoringPage() {
       scoreRun.scores &&
       selectedId
     ) {
+      // Deduplicate: KB writes triggered by this effect change
+      // currentInputsSignature, which would otherwise re-fire this effect
+      // endlessly. A stable key based on client + timestamp breaks the loop.
+      const runKey = `${selectedId}:${scoreRun.generated_at ?? scoreRun.scores.length}`;
+      if (processedRunKeyRef.current === runKey) return;
+      processedRunKeyRef.current = runKey;
       const scores = scoreRun.scores.map((s) => suggestedToScore(s, engagement.id));
       const ts = scoreRun.generated_at ?? new Date().toISOString();
       const composite = calculateCompositeScore(scores);

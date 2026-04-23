@@ -2,13 +2,22 @@
 
 import { useSyncExternalStore } from "react";
 import type { KnowledgeInsight } from "@/components/documents/knowledge-insights-panel";
-import { mergeExtractedInsights } from "@/lib/preview/extracted-insights";
+import {
+  mergeExtractedInsights,
+  readExtractedInsights,
+} from "@/lib/preview/extracted-insights";
 import {
   upsertUploadedDoc,
   type UploadedDoc,
 } from "@/lib/preview/uploaded-docs";
+import {
+  readClientKb,
+  currentContextSlice,
+  formatKnowledgeBaseEvidence,
+} from "@/lib/preview/knowledge-base";
 
 const EVENT = "kaptrix:insights-run-change";
+const CONCURRENT_LIMIT = 3;
 
 export type InsightsRunStatus = "idle" | "running" | "done" | "error";
 
@@ -88,57 +97,87 @@ export function startInsightsRun(args: {
   void runInsightsExtraction(args.clientId, targets);
 }
 
+async function extractOneDoc(
+  clientId: string,
+  doc: UploadedDoc,
+  kbContext: string,
+  existingInsightSummaries: { id: string; category: string; insight: string }[],
+): Promise<number> {
+  const res = await fetch("/api/preview/extract-insights", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_id: clientId,
+      doc_id: doc.id,
+      filename: doc.filename,
+      category: doc.category,
+      text: doc.parsed_text,
+      kb_context: kbContext,
+      existing_insight_summaries: existingInsightSummaries,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? `HTTP ${res.status}`);
+  }
+
+  const data = (await res.json()) as { insights?: KnowledgeInsight[] };
+  if (Array.isArray(data.insights) && data.insights.length > 0) {
+    mergeExtractedInsights(clientId, data.insights);
+    return data.insights.length;
+  }
+  return 0;
+}
+
 async function runInsightsExtraction(
   clientId: string,
   documents: UploadedDoc[],
 ): Promise<void> {
+  // Snapshot KB context (intake, pre_analysis) and existing insights once
+  // before the batch so all parallel calls share the same context.
+  const kbSlice = currentContextSlice(readClientKb(clientId), "insights");
+  const kbContext = formatKnowledgeBaseEvidence(kbSlice).join("\n").slice(0, 2_000);
+  const existingInsightSummaries = readExtractedInsights(clientId)
+    .map((i) => ({ id: i.id, category: i.category, insight: i.insight }))
+    .slice(0, 30);
+
+  // Mark all as extracting up-front so status bars appear immediately.
+  for (const doc of documents) {
+    upsertUploadedDoc({ ...doc, parse_status: "extracting" });
+  }
+
   let processed = 0;
   let firstError: string | undefined;
 
-  for (const doc of documents) {
-    try {
-      upsertUploadedDoc({ ...doc, parse_status: "extracting" });
-      const res = await fetch("/api/preview/extract-insights", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_id: clientId,
-          doc_id: doc.id,
-          filename: doc.filename,
-          category: doc.category,
-          text: doc.parsed_text,
-        }),
-      });
+  // Process in batches of CONCURRENT_LIMIT to avoid overwhelming the LLM.
+  for (let i = 0; i < documents.length; i += CONCURRENT_LIMIT) {
+    const batch = documents.slice(i, i + CONCURRENT_LIMIT);
 
-      let insightsCount = 0;
-      if (res.ok) {
-        const data = (await res.json()) as {
-          insights?: KnowledgeInsight[];
-        };
-        if (Array.isArray(data.insights) && data.insights.length > 0) {
-          mergeExtractedInsights(clientId, data.insights);
-          insightsCount = data.insights.length;
+    const results = await Promise.allSettled(
+      batch.map((doc) => extractOneDoc(clientId, doc, kbContext, existingInsightSummaries)),
+    );
+
+    for (let j = 0; j < results.length; j++) {
+      const doc = batch[j];
+      const result = results[j];
+
+      if (result.status === "fulfilled") {
+        upsertUploadedDoc({
+          ...doc,
+          parse_status: "parsed",
+          insights_count: (doc.insights_count ?? 0) + result.value,
+        });
+      } else {
+        if (!firstError) {
+          firstError =
+            result.reason instanceof Error ? result.reason.message : "Network error";
         }
-      } else if (!firstError) {
-        const err = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        firstError = err.error ?? `HTTP ${res.status}`;
+        upsertUploadedDoc({ ...doc, parse_status: "parsed" });
       }
-
-      upsertUploadedDoc({
-        ...doc,
-        parse_status: "parsed",
-        insights_count: (doc.insights_count ?? 0) + insightsCount,
-      });
-    } catch (err) {
-      if (!firstError) {
-        firstError = err instanceof Error ? err.message : "Network error";
-      }
-      upsertUploadedDoc({ ...doc, parse_status: "parsed" });
     }
 
-    processed += 1;
+    processed += batch.length;
     setState({
       status: "running",
       clientId,

@@ -20,7 +20,7 @@ import { getServiceClient } from "@/lib/supabase/service";
 import type { KnowledgeInsight } from "@/components/documents/knowledge-insights-panel";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 90;
 
 const CATEGORIES = [
   "commercial",
@@ -69,6 +69,10 @@ interface ExtractBody {
   filename?: string;
   category?: string;
   text?: string;
+  /** Serialised KB evidence from intake/pre_analysis steps — context only. */
+  kb_context?: string;
+  /** Already-extracted insights so the LLM can cross-reference rather than duplicate. */
+  existing_insight_summaries?: { id: string; category: string; insight: string }[];
 }
 
 type IntakeAnswers = Record<string, string | number | string[]>;
@@ -95,7 +99,7 @@ async function callLlm(
       maxTokens: 1200,
       model: getSelfHostedLlmModelForTask("report"),
       jsonMode: true,
-      timeoutMs: 180_000,
+      timeoutMs: 60_000,
     });
     return result.content;
   }
@@ -109,7 +113,7 @@ async function callLlm(
       temperature: 0.1,
       maxTokens: 1200,
       jsonMode: true,
-      timeoutMs: 180_000,
+      timeoutMs: 60_000,
     });
     return result.content;
   }
@@ -234,12 +238,30 @@ export async function POST(request: NextRequest) {
     clientId: body.client_id,
   });
 
+  const kbContext = (body.kb_context ?? "").trim();
+  const existingSummaries = body.existing_insight_summaries ?? [];
+
   const slug = makeSlug(filename);
-  const userMessage = `${
-    intakeContext
-      ? `INTAKE CONTEXT (from Supabase; context only — not evidence):\n${intakeContext}\n\n`
-      : ""
-  }Document: "${filename}" (category: ${category ?? "unknown"})
+
+  const contextBlocks: string[] = [];
+  if (intakeContext) {
+    contextBlocks.push(
+      `INTAKE & KB CONTEXT (context only — do NOT treat as document evidence):\n${intakeContext}`,
+    );
+  }
+  if (kbContext) {
+    contextBlocks.push(`KNOWLEDGE BASE CONTEXT:\n${kbContext}`);
+  }
+  if (existingSummaries.length > 0) {
+    const summaryLines = existingSummaries
+      .map((s) => `  [${s.category}] ${s.insight} (id: ${s.id})`)
+      .join("\n");
+    contextBlocks.push(
+      `ALREADY-EXTRACTED INSIGHTS (avoid duplicating these; cross-reference where relevant):\n${summaryLines}`,
+    );
+  }
+
+  const userMessage = `${contextBlocks.length > 0 ? contextBlocks.join("\n\n") + "\n\n" : ""}Document: "${filename}" (category: ${category ?? "unknown"})
 
 --- BEGIN DOCUMENT TEXT ---
 ${cappedText}
