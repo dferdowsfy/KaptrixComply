@@ -17,6 +17,11 @@ import {
   checkAiQueryLimit,
   recordUsage,
 } from "@/lib/plans-server";
+import {
+  formatKnowledgeBaseEvidence,
+  type KnowledgeStep,
+  type KnowledgeEntry,
+} from "@/lib/preview/kb-format";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -140,6 +145,96 @@ const SUGGESTION_POOL: Record<string, string[]> = {
   default: ["Summarize the key risks", "What are the strengths?", "What needs more evidence?"],
 };
 
+/**
+ * Format raw intake form answers (key→value map from user_workspace_state
+ * kind="intake_answers") into labelled evidence lines for the LLM prompt.
+ */
+function formatRawIntakeAnswers(
+  answers: Record<string, unknown>,
+): string {
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(answers).sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
+    const rendered = Array.isArray(value)
+      ? value.map(String).filter(Boolean).join(", ")
+      : value === null || value === undefined || value === ""
+        ? ""
+        : String(value);
+    if (!rendered) continue;
+    const label = key
+      .replace(/__note$/i, " note")
+      .replace(/__other$/i, " other")
+      .replace(/_/g, " ");
+    lines.push(`[intake · ${label}] ${rendered}`);
+  }
+  return lines.join("\n").slice(0, 6_000);
+}
+
+/**
+ * Fetch the engagement's KB and raw intake answers from user_workspace_state.
+ * Returns formatted evidence strings ready to embed in the LLM prompt.
+ */
+async function fetchWorkspaceContext(
+  clientId: string,
+  authedUserId: string | null,
+): Promise<string> {
+  const svc = getServiceClient();
+  if (!svc) return "";
+
+  const base = svc
+    .from("user_workspace_state")
+    .select("state, updated_at")
+    .eq("engagement_id", clientId);
+
+  const kbQuery = authedUserId
+    ? base.eq("kind", "knowledge_base").eq("user_id", authedUserId).maybeSingle()
+    : base.eq("kind", "knowledge_base").order("updated_at", { ascending: false }).limit(1).maybeSingle();
+
+  const intakeQuery = authedUserId
+    ? svc
+        .from("user_workspace_state")
+        .select("state, updated_at")
+        .eq("engagement_id", clientId)
+        .eq("kind", "intake_answers")
+        .eq("user_id", authedUserId)
+        .maybeSingle()
+    : svc
+        .from("user_workspace_state")
+        .select("state, updated_at")
+        .eq("engagement_id", clientId)
+        .eq("kind", "intake_answers")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+  const [{ data: kbRow }, { data: intakeRow }] = await Promise.all([
+    kbQuery,
+    intakeQuery,
+  ]);
+
+  const parts: string[] = [];
+
+  // Full processed KB (intake + coverage + insights + scoring summaries).
+  if (kbRow?.state && typeof kbRow.state === "object") {
+    const kb = kbRow.state as Partial<Record<KnowledgeStep, KnowledgeEntry>>;
+    const lines = formatKnowledgeBaseEvidence(kb);
+    if (lines.length > 0) parts.push(lines.join("\n").slice(0, 20_000));
+  }
+
+  // Raw intake answers — include when the KB doesn't already have an intake
+  // step (e.g. user filled the form but hasn't run KB generation yet).
+  const kbHasIntake = parts[0]?.includes("[knowledge base · Intake");
+  if (!kbHasIntake && intakeRow?.state && typeof intakeRow.state === "object") {
+    const formatted = formatRawIntakeAnswers(
+      intakeRow.state as Record<string, unknown>,
+    );
+    if (formatted) parts.push(formatted);
+  }
+
+  return parts.join("\n");
+}
+
 function generateSuggestions(question: string): string[] {
   const q = question.toLowerCase();
   for (const [keyword, suggestions] of Object.entries(SUGGESTION_POOL)) {
@@ -213,6 +308,17 @@ export async function POST(req: Request) {
     }
   }
 
+  // Fetch intake answers + processed KB directly from user_workspace_state
+  // so the model sees what the operator filled in regardless of localStorage.
+  let workspaceContext = "";
+  if (clientId) {
+    try {
+      workspaceContext = await fetchWorkspaceContext(clientId, authedUserId);
+    } catch {
+      // non-fatal
+    }
+  }
+
   // Always include the client-submitted knowledge base (intake, coverage,
   // insights, pre-analysis, uploaded document text) so operator-submitted
   // context is available to the model. Uploaded-doc bodies can be large
@@ -221,6 +327,7 @@ export async function POST(req: Request) {
 
   let context = [
     snapshotContext,
+    workspaceContext && `--- ENGAGEMENT KNOWLEDGE BASE (from Supabase) ---\n${workspaceContext}`,
     callerContext && `--- CLIENT-ASSEMBLED EVIDENCE ---\n${callerContext}`,
     kbText && `--- OPERATOR-SUBMITTED KNOWLEDGE BASE ---\n${kbText}`,
   ]
