@@ -271,12 +271,16 @@ function PromoteForm({
           insight_summary: insightSummary || `Promoted from category: ${categoryName}`,
         }),
       });
+      const data = await res.json().catch(() => ({})) as { error?: string; link_error?: string };
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
+        throw new Error(data.error ?? `HTTP ${res.status}`);
       }
-      setSuccess(true);
-      setTimeout(onDone, 1500);
+      if (data.link_error) {
+        setError(`Target created but lineage link failed: ${data.link_error}`);
+      } else {
+        setSuccess(true);
+        setTimeout(onDone, 1500);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Promotion failed");
     } finally {
@@ -396,9 +400,13 @@ function NewCategoryForm({ onCreated }: { onCreated: () => void }) {
         }),
       });
 
+      const data = await res.json().catch(() => ({})) as { error?: string; profile_error?: string };
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      if (data.profile_error) {
+        setError(`Engagement created but profile failed to save: ${data.profile_error}`);
+        return;
       }
 
       onCreated();

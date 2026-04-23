@@ -10,7 +10,8 @@
 // which every existing UI ignores unless it opts in.
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getServiceClient } from "@/lib/supabase/service";
+import { requireAuth, authErrorResponse } from "@/lib/security/authz";
 import { logAuditEvent } from "@/lib/audit/logger";
 import type { EngagementTier, DealStage } from "@/lib/types";
 
@@ -36,13 +37,17 @@ interface PromoteBody {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { id: sourceId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAuth();
+  } catch (err) {
+    return authErrorResponse(err);
+  }
+
+  const supabase = getServiceClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
 
   let body: PromoteBody;
@@ -98,7 +103,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         body.client_contact_email ?? source.client_contact_email ?? null,
       deal_stage: body.deal_stage ?? source.deal_stage,
       tier: body.tier ?? source.tier,
-      assigned_operator_id: user.id,
+      assigned_operator_id: ctx.userId,
       status: "intake",
       subject_kind: "target",
       promoted_from_engagement_id: sourceId,
@@ -124,7 +129,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         insight_key: body.insight_key,
         insight_summary: body.insight_summary,
         rubric_snapshot: body.rubric_snapshot ?? {},
-        created_by: user.id,
+        created_by: ctx.userId,
       },
       { onConflict: "source_engagement_id,target_engagement_id,insight_key" },
     );

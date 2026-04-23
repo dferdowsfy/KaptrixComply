@@ -15,7 +15,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase/service";
-import { createClient } from "@/lib/supabase/server";
 import { requireAuth, authErrorResponse } from "@/lib/security/authz";
 import { logAuditEvent } from "@/lib/audit/logger";
 
@@ -136,7 +135,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabase = await createClient();
+  // Use the service client so RLS does not interfere. Auth has already been
+  // verified above via requireAuth(); assigned_operator_id is stamped here.
+  const supabase = getServiceClient();
+  if (!supabase) {
+    return NextResponse.json(
+      { error: "Service unavailable" },
+      { status: 503 },
+    );
+  }
   const categorySlug = body.category_slug?.trim() || slugify(body.category_name);
 
   // Create the engagement first. subject_kind is stamped server-side so the
