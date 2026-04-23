@@ -75,3 +75,56 @@ export function mergeInsightIntoAnswers(
   next[targetId] = insight.suggested_intake_value;
   return next;
 }
+
+// ============================================================
+// AI Category Diligence — intake config selector (Phase 2)
+// ============================================================
+// Additive, zero-impact helper. No existing caller is modified.
+// The target-mode config MUST stay identical to today's behaviour, so
+// the 'target' branch intentionally returns `null` — callers interpret
+// null as "use the existing industry-driven intake unchanged".
+// The 'category' branch advertises a distinct question set focused on
+// category-level diligence (market maturity, buyer shape, provider
+// landscape, regulatory pressure). Actual question rendering is wired
+// up in a later phase; this selector is the seam.
+
+import type { SubjectKind } from "@/lib/types";
+
+export interface CategoryIntakeConfig {
+  kind: "category";
+  industry: Industry | null;
+  /** Stable IDs for the additional intake questions surfaced in category mode. */
+  questionIds: readonly string[];
+}
+
+export type IntakeConfigSelection = CategoryIntakeConfig | null;
+
+const CATEGORY_QUESTION_IDS = [
+  "category_thesis",
+  "category_time_horizon",
+  "category_buyer_shape",
+  "category_provider_landscape",
+  "category_regulatory_pressure",
+  "category_peer_categories",
+  "category_screening_criteria",
+] as const;
+
+/**
+ * Resolve the intake config for a given subject_kind + industry pair.
+ * - 'target' → returns `null` (classic flow unchanged).
+ * - 'category' → returns a CategoryIntakeConfig with an industry-aware
+ *   question list. Industry is accepted so future phases can tailor the
+ *   question set without a second selector.
+ */
+export function intakeConfigFor(
+  subjectKind: SubjectKind,
+  industry: Industry | null,
+): IntakeConfigSelection {
+  if (subjectKind !== "category") return null;
+  return {
+    kind: "category",
+    industry,
+    questionIds: CATEGORY_QUESTION_IDS,
+  };
+}
+

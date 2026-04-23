@@ -40,6 +40,19 @@ export async function POST(request: NextRequest) {
     return authErrorResponse(err);
   }
 
+  // Read the parent engagement's subject_kind so we can stamp every new
+  // document row. Column is nullable (migration 00034), so on any read
+  // miss we fall back to undefined — the downstream insert simply omits
+  // the field and legacy behaviour is preserved.
+  const { data: engagementRow } = await supabase
+    .from("engagements")
+    .select("subject_kind")
+    .eq("id", engagementId)
+    .maybeSingle();
+  const engagementSubjectKind =
+    (engagementRow?.subject_kind as "target" | "category" | undefined) ??
+    undefined;
+
   if (files.length > UPLOAD_LIMITS.MAX_FILES_PER_UPLOAD) {
     return NextResponse.json(
       { error: `Maximum ${UPLOAD_LIMITS.MAX_FILES_PER_UPLOAD} files per upload` },
@@ -117,6 +130,9 @@ export async function POST(request: NextRequest) {
         uploaded_by: userId,
         parse_status: "queued",
         checksum_sha256: checksum,
+        ...(engagementSubjectKind
+          ? { subject_kind: engagementSubjectKind }
+          : {}),
       })
       .select()
       .single();

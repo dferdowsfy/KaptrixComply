@@ -19,7 +19,8 @@ import {
 import { llmChat } from "@/lib/llm/client";
 import { openRouterChat, getOpenRouterModel } from "@/lib/llm/openrouter";
 import { SCORING_DIMENSIONS } from "@/lib/constants";
-import type { DimensionConfig } from "@/lib/types";
+import type { DimensionConfig, SubjectKind } from "@/lib/types";
+import { applyCategoryLabels } from "@/lib/scoring/category-labels";
 import {
   AuthError,
   assertPreviewTabVisible,
@@ -44,6 +45,11 @@ interface SuggestBody {
    *  client from preview_uploaded_docs + preview_snapshots and merges
    *  their text into the scoring prompt server-side. */
   client_id?: string;
+  /** Optional discriminator for AI Category Diligence (Phase 3).
+   *  Defaults to 'target'. When 'category' the prompt is re-framed to
+   *  score the category itself (not a single company). Scoring math,
+   *  dimensions, sub-criteria, weights, and bands are unchanged. */
+  subject_kind?: SubjectKind;
 }
 
 // ── Terse prompt builder for one dimension ────────────────────────────────────
@@ -52,8 +58,16 @@ interface SuggestBody {
 // but the model only needs the label to calibrate. The operator can read the
 // full band description in the UI.
 
-function buildDimensionSystemPrompt(dim: DimensionConfig): string {
-  const criteria = dim.sub_criteria
+function buildDimensionSystemPrompt(
+  dim: DimensionConfig,
+  subjectKind: SubjectKind = "target",
+): string {
+  // Apply the category-mode label overlay only when requested. For
+  // subject_kind === 'target' this is a no-op clone — the prompt is
+  // byte-identical to the pre-Phase-3 build.
+  const display = applyCategoryLabels(dim, subjectKind);
+
+  const criteria = display.sub_criteria
     .map((sub) => {
       const bands = sub.score_bands
         ? sub.score_bands
@@ -64,7 +78,12 @@ function buildDimensionSystemPrompt(dim: DimensionConfig): string {
     })
     .join("\n\n");
 
-  return `You are an AI diligence analyst scoring the "${dim.name}" dimension.
+  const subjectLine =
+    subjectKind === "category"
+      ? `You are an AI diligence analyst scoring the "${display.name}" dimension for an AI *category* (not a single company). Reason across the whole category — incumbents, challengers, buyer shape, provider landscape — and score the category's overall posture on each sub-criterion.`
+      : `You are an AI diligence analyst scoring the "${display.name}" dimension.`;
+
+  return `${subjectLine}
 
 RULES
 - Scores must be multiples of 0.5 in [0, 5].
@@ -114,9 +133,14 @@ async function scoreDimension(
   dim: DimensionConfig,
   knowledge_base: string,
   useSelfHosted: boolean,
+  subjectKind: SubjectKind = "target",
 ): Promise<SuggestedScore[]> {
-  const systemPrompt = buildDimensionSystemPrompt(dim);
-  const userPrompt = `ENGAGEMENT KNOWLEDGE BASE\n${knowledge_base}\n\nScore the ${dim.sub_criteria.length} sub-criteria above. Return only the JSON.`;
+  const systemPrompt = buildDimensionSystemPrompt(dim, subjectKind);
+  const subjectHeader =
+    subjectKind === "category"
+      ? "AI CATEGORY KNOWLEDGE BASE"
+      : "ENGAGEMENT KNOWLEDGE BASE";
+  const userPrompt = `${subjectHeader}\n${knowledge_base}\n\nScore the ${dim.sub_criteria.length} sub-criteria above. Return only the JSON.`;
 
   const messages: { role: "system" | "user"; content: string }[] = [
     { role: "system", content: systemPrompt },
@@ -254,8 +278,17 @@ export async function POST(req: Request) {
 
   // Fan out: 6 parallel dimension-level calls. Each generates 4-5 scores and
   // finishes in seconds; total time = max(all 6), not sum(all 24).
+  const subjectKind: SubjectKind =
+    body.subject_kind === "category" ? "category" : "target";
   const results = await Promise.allSettled(
-    SCORING_DIMENSIONS.map((dim) => scoreDimension(dim, knowledge_base, useSelfHosted && !useOpenRouter)),
+    SCORING_DIMENSIONS.map((dim) =>
+      scoreDimension(
+        dim,
+        knowledge_base,
+        useSelfHosted && !useOpenRouter,
+        subjectKind,
+      ),
+    ),
   );
 
   const scores: SuggestedScore[] = [];

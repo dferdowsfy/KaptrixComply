@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { SectionHeader } from "@/components/preview/preview-shell";
 import { AiReportCard } from "@/components/reports/ai-report-card";
 import { SavedReportsList } from "@/components/reports/saved-reports-list";
-import { ADVANCED_REPORTS } from "@/lib/reports/advanced-reports";
+import { getAdvancedReportsForSubject } from "@/lib/reports/advanced-reports";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import {
   formatKnowledgeBaseEvidence,
@@ -19,6 +19,12 @@ const EMPTY_KB: Partial<Record<KnowledgeStep, KnowledgeEntry>> = {};
 
 export default function PreviewReportPage() {
   const { client, selectedId } = useSelectedPreviewClient();
+
+  // AI Category Diligence: report catalog is selected by the engagement's
+  // subject_kind. Target-mode clients (default) see the original 14
+  // ADVANCED_REPORTS; category-mode clients see the 10 category_* reports.
+  const subjectKind = client.subject_kind ?? "target";
+  const reports = getAdvancedReportsForSubject(subjectKind);
 
   const kb = useSyncExternalStore(
     subscribeKnowledgeBase,
@@ -66,11 +72,11 @@ export default function PreviewReportPage() {
           />
           <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-700 shadow-sm ring-1 ring-indigo-200">
             <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
-            {ADVANCED_REPORTS.length} reports available
+            {reports.length} reports available
           </span>
         </div>
         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {ADVANCED_REPORTS.map((config) => (
+          {reports.map((config) => (
             <AiReportCard
               key={config.id}
               config={config}

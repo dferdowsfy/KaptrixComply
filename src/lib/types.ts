@@ -11,6 +11,15 @@ export type UserRole = 'operator' | 'client_viewer' | 'admin';
 export type ReferralSource = 'direct' | 'referral' | 'signal_hunter' | 'platform' | 'content';
 export type EngagementOutcome = 'proceeded' | 'passed' | 'renegotiated' | 'pending';
 
+/**
+ * Discriminator for the diligence pathway an engagement represents.
+ *   - 'target'   — classic Kaptrix flow: evaluate a specific company / product.
+ *   - 'category' — AI Category Diligence: evaluate an AI category or theme.
+ * Backed by engagements.subject_kind (migration 00032). Every existing
+ * engagement is 'target' via DB default.
+ */
+export type SubjectKind = 'target' | 'category';
+
 export type DocumentCategory =
   | 'deck' | 'architecture' | 'security' | 'model_ai' | 'data_privacy'
   | 'customer_contracts' | 'vendor_list' | 'financial' | 'incident_log'
@@ -60,6 +69,36 @@ export interface Engagement {
   delivery_deadline: string | null;
   referral_source: ReferralSource | null;
   outcome: EngagementOutcome | null;
+  /**
+   * Discriminator for the diligence pathway (migration 00032). The DB
+   * column is NOT NULL with DEFAULT 'target', so rows fetched from
+   * Supabase always carry a value. Marked optional on the TS side so
+   * demo data, tests, and in-flight clones do not have to set it.
+   */
+  subject_kind?: SubjectKind;
+  /** Optional display label for the subject (category name for category mode). */
+  subject_label?: string | null;
+  /** If this engagement was promoted from a category diligence, the source engagement id. */
+  promoted_from_engagement_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Sibling 1:1 profile for category-mode engagements (migration 00035).
+ * Only populated when the parent engagement has subject_kind = 'category'.
+ */
+export interface EngagementCategoryProfile {
+  id: string;
+  engagement_id: string;
+  category_slug: string;
+  category_name: string;
+  thesis: string | null;
+  time_horizon_months: number | null;
+  /** List of neighbouring / adjacent AI categories the operator wants to compare against. */
+  peer_categories: string[];
+  /** Free-form rubric used to turn category findings into target-screening criteria. */
+  screening_criteria: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +117,12 @@ export interface Document {
   parse_status: ParseStatus;
   parse_error: string | null;
   token_count: number | null;
+  /**
+   * Denormalised discriminator (migration 00034). Null = inherit from
+   * the parent engagement. Stamped on insert by the upload routes.
+   * Optional on the TS side — legacy rows predate the column.
+   */
+  subject_kind?: SubjectKind | null;
 }
 
 export interface DocumentRequirement {
@@ -88,6 +133,12 @@ export interface DocumentRequirement {
   is_required: boolean;
   weight: number;
   limits_when_missing: string;
+  /**
+   * Which pathway this requirement applies to (migration 00033). DB
+   * column is NOT NULL DEFAULT 'target'. Optional on the TS side for
+   * backward compatibility with in-memory fixtures.
+   */
+  subject_kind?: SubjectKind;
 }
 
 export interface PreAnalysis {
@@ -126,6 +177,13 @@ export interface Score {
   created_at: string;
   updated_at: string;
   updated_by: string | null;
+  /**
+   * Denormalised discriminator (migration 00034). Null = inherit from
+   * the parent engagement. Enforced at the API layer: a save is
+   * rejected when this disagrees with engagements.subject_kind.
+   * Optional on the TS side — legacy rows predate the column.
+   */
+  subject_kind?: SubjectKind | null;
 }
 
 export interface BenchmarkCase {
@@ -361,6 +419,22 @@ export interface CreateEngagementInput {
   engagement_fee?: number;
   delivery_deadline?: string;
   referral_source?: ReferralSource;
+  /**
+   * AI Category Diligence additions (Phase 2, migration 00032 / 00035).
+   * All optional — omitting them yields the classic target-mode flow.
+   * When subject_kind === 'category', callers SHOULD also provide
+   * category_profile so the sibling profile row is written atomically.
+   */
+  subject_kind?: SubjectKind;
+  subject_label?: string;
+  category_profile?: {
+    category_slug: string;
+    category_name: string;
+    thesis?: string | null;
+    time_horizon_months?: number | null;
+    peer_categories?: string[];
+    screening_criteria?: Record<string, unknown>;
+  };
 }
 
 export interface UpdateScoreInput {

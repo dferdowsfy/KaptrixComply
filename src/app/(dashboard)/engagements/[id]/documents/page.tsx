@@ -11,13 +11,29 @@ export default async function DocumentsPage({ params }: Props) {
   const { id } = await params;
   const supabase = await createClient();
 
+  // Read the engagement first so we can filter requirements by subject_kind.
+  // Legacy engagements return subject_kind = 'target' via the DB default
+  // (migration 00032), so the target-mode path is unchanged.
+  const { data: engagementRow } = await supabase
+    .from("engagements")
+    .select("subject_kind")
+    .eq("id", id)
+    .maybeSingle();
+  const engagementSubjectKind =
+    (engagementRow?.subject_kind as "target" | "category" | undefined) ??
+    "target";
+
   const [{ data: documents }, { data: requirements }] = await Promise.all([
     supabase
       .from("documents")
       .select("*")
       .eq("engagement_id", id)
       .order("uploaded_at", { ascending: false }),
-    supabase.from("document_requirements").select("*").order("category"),
+    supabase
+      .from("document_requirements")
+      .select("*")
+      .eq("subject_kind", engagementSubjectKind)
+      .order("category"),
   ]);
 
   return (

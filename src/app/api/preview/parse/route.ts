@@ -39,6 +39,16 @@ export async function POST(request: NextRequest) {
   const docId = (formData.get("doc_id") as string | null)?.trim() || null;
   const category =
     (formData.get("category") as string | null)?.trim() || "other";
+  // Optional subject_kind tag — lets the Category Diligence preview flow
+  // mark its uploaded KB rows so later surfaces (coverage, scoring) can
+  // filter appropriately. Unknown / missing values are left as NULL and
+  // treated as "inherit from engagement" downstream.
+  const rawSubjectKind =
+    (formData.get("subject_kind") as string | null)?.trim() || null;
+  const subjectKind =
+    rawSubjectKind === "target" || rawSubjectKind === "category"
+      ? rawSubjectKind
+      : null;
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const headBytes = buffer.subarray(0, 16);
@@ -83,6 +93,7 @@ export async function POST(request: NextRequest) {
               token_count: tokenCount,
               parse_status: "parsed",
               updated_at: new Date().toISOString(),
+              ...(subjectKind ? { subject_kind: subjectKind } : {}),
             },
             { onConflict: "id" },
           );

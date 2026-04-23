@@ -3,6 +3,10 @@
 -- Renumber if needed, or use deferred constraints. For now, we create it here
 -- and the scores FK will reference it.
 
+-- pgvector is required for the embedding column. Supabase ships with
+-- the extension available; we just need to enable it.
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE public.benchmark_cases (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   case_anchor_id TEXT NOT NULL UNIQUE,

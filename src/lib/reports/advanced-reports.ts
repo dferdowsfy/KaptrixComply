@@ -9,7 +9,20 @@ export type AdvancedReportId =
   | "risk_register"
   | "competitive_posture"
   | "value_creation"
-  | "evidence_coverage";
+  | "evidence_coverage"
+  // AI Category Diligence (Phase 4) — see CATEGORY_ADVANCED_REPORTS below.
+  // Tagged with `subject_kind: 'category'` so getAdvancedReportsForSubject
+  // can filter the catalog cleanly.
+  | "category_qualification_snapshot"
+  | "category_structural_risk_map"
+  | "category_credibility_analysis"
+  | "category_dependency_risk"
+  | "category_governance_expectations"
+  | "category_production_reality"
+  | "category_open_unknowns"
+  | "category_investor_diligence_traps"
+  | "category_target_screening_criteria"
+  | "category_coverage_confidence_summary";
 
 export interface AdvancedReportSection {
   /** Stable id used by the API + client orchestrator. */
@@ -38,6 +51,10 @@ export interface AdvancedReportConfig {
    *  10-page-scale reports without any single call approaching the
    *  Vercel function timeout. */
   sections?: AdvancedReportSection[];
+  /** AI Category Diligence (Phase 4). Defaults to 'target' when omitted
+   *  so every existing entry retains its current subject scoping. The
+   *  reports UI uses `getAdvancedReportsForSubject` to filter. */
+  subject_kind?: import("@/lib/types").SubjectKind;
 }
 
 const FORMAT_RULES = `Output format: clean GitHub-flavored markdown.
@@ -755,4 +772,216 @@ STRICT RULES:
  */
 export function buildUpdateSystemPrompt(basePrompt: string): string {
   return `${REPORT_UPDATE_PROTOCOL}\n\n---\n\n${basePrompt}`;
+}
+
+// ============================================================================
+// AI CATEGORY DILIGENCE — Phase 4 catalog
+// ============================================================================
+// Ten on-demand reports framed for an AI *category* (not a single company).
+// Each entry inherits FORMAT_RULES + OPERATING_MODE and is single-call (no
+// `sections`) — they are tighter than the master target reports and target
+// 4-6 dense pages. Filtering is opt-in via `getAdvancedReportsForSubject`,
+// so the existing target catalog and `ADVANCED_REPORTS` array are unchanged
+// for every existing caller.
+
+function buildCategoryPrompt(focus: string, mandate: string): string {
+  return `You are a senior AI category analyst writing for an investment committee. Your subject is an AI *category* (e.g. "AI legal research", "AI agent infra"), not a single company. Reason across the whole category — incumbents, challengers, buyer shape, provider landscape, regulatory pressure — and produce a category-level read.
+
+FOCUS: ${focus}
+
+MANDATE: ${mandate}
+
+${OPERATING_MODE}
+
+${FORMAT_RULES}`;
+}
+
+export const CATEGORY_ADVANCED_REPORTS: AdvancedReportConfig[] = [
+  {
+    id: "category_qualification_snapshot",
+    subject_kind: "category",
+    title: "Category Qualification Snapshot",
+    tagline: "Is this category investable right now?",
+    description:
+      "One-page top-of-funnel verdict on whether the category clears the basic investability bar — market shape, buyer pull, regulatory headroom, and provider landscape.",
+    accent: "from-indigo-600 via-indigo-500 to-violet-500",
+    eyebrow: "Category · Snapshot",
+    systemPrompt: buildCategoryPrompt(
+      "Top-of-funnel category qualification.",
+      "Render six labelled sections: Category Definition, Buyer Shape, Provider Landscape, Regulatory Headroom, Timing, and Verdict. Verdict is one of INVESTABLE / WATCH / PASS with a single-sentence Primary Driver and a single-sentence Failure Trigger. End with the standard final-position block.",
+    ),
+    userPromptIntro:
+      "Produce the Category Qualification Snapshot for the AI category described below.",
+  },
+  {
+    id: "category_structural_risk_map",
+    subject_kind: "category",
+    title: "Category Structural Risk Map",
+    tagline: "What can break this category — independent of any vendor",
+    description:
+      "Severity × Likelihood map of the structural risks that hit every player in the category: foundation-model commoditization, incumbent distribution, buyer fragmentation, regulatory shocks, capital-intensity traps.",
+    accent: "from-rose-600 via-rose-500 to-amber-500",
+    eyebrow: "Category · Risk Map",
+    systemPrompt: buildCategoryPrompt(
+      "Category-level structural risks.",
+      "Produce a ranked risk register table (Risk | Severity 1-5 | Likelihood 1-5 | Risk Score | Trigger | Time-to-Materialization | Hedge). After the table, write a 'Concentrated bets that fail first' paragraph naming the two risks with the highest Risk Score and the named vendor archetypes most exposed.",
+    ),
+    userPromptIntro:
+      "Produce the Category Structural Risk Map for the AI category described below.",
+  },
+  {
+    id: "category_credibility_analysis",
+    subject_kind: "category",
+    title: "Category Credibility Analysis",
+    tagline: "Real product category, or hype cycle?",
+    description:
+      "Illusion test for the category itself — separates substantive product value from narrative momentum, distinguishes durable buyer pull from analyst noise, and grades the credibility of the most-cited claims.",
+    accent: "from-amber-600 via-orange-500 to-rose-500",
+    eyebrow: "Category · Credibility",
+    systemPrompt: buildCategoryPrompt(
+      "Category-level credibility audit.",
+      "Classify the category overall as REAL / PARTIAL / ILLUSION. Then audit five most-cited category claims (analyst quotes, vendor marketing, press narratives) — for each, tag [L1/L2/L3], decide TRUE / OVERSTATED / FALSE, and cite the artifact that settles it. Close with a Decision line.",
+    ),
+    userPromptIntro:
+      "Produce the Category Credibility Analysis for the AI category described below.",
+  },
+  {
+    id: "category_dependency_risk",
+    subject_kind: "category",
+    title: "Category Dependency & Tooling Risk",
+    tagline: "Foundation models, infra, and switching costs",
+    description:
+      "Maps category-wide dependencies on foundation models, GPU/cloud infra, third-party tooling, and data sources. Calls the failure modes when a single provider raises prices, deprecates an API, or goes down.",
+    accent: "from-cyan-600 via-sky-500 to-blue-500",
+    eyebrow: "Category · Dependencies",
+    systemPrompt: buildCategoryPrompt(
+      "Provider, model, and tooling dependencies across the category.",
+      "Produce a dependency matrix table (Dependency | Concentration | Switching Cost | Time-to-Switch | Failure Mode | Worst-Case Impact). Then a Replacement Test paragraph estimating % category value loss under the two most-likely provider shocks, with the three drivers named.",
+    ),
+    userPromptIntro:
+      "Produce the Category Dependency & Tooling Risk report for the AI category described below.",
+  },
+  {
+    id: "category_governance_expectations",
+    subject_kind: "category",
+    title: "Category Governance & Safety Expectations",
+    tagline: "What buyers, regulators, and auditors will demand",
+    description:
+      "Forward read on the governance, audit, and safety controls every credible vendor in the category will need within 18 months. Names regulators, named frameworks, and named buyer-imposed requirements.",
+    accent: "from-emerald-600 via-emerald-500 to-lime-500",
+    eyebrow: "Category · Governance",
+    systemPrompt: buildCategoryPrompt(
+      "Governance and safety bar across the category.",
+      "Section 1: regulatory landscape (cite specific statutes / guidance / enforcement actions, classify Tailwind / Neutral / Headwind). Section 2: buyer-imposed requirements (cite specific MSA clauses or RFP lines from the evidence). Section 3: 18-month minimum credible posture — the named controls a vendor MUST have to win deals.",
+    ),
+    userPromptIntro:
+      "Produce the Category Governance & Safety Expectations report for the AI category described below.",
+  },
+  {
+    id: "category_production_reality",
+    subject_kind: "category",
+    title: "Category Production Reality",
+    tagline: "What 'production-grade' actually means here",
+    description:
+      "Operator-grade read on the realistic production bar in this category — latency, accuracy, reliability, scale economics, ops burden — and where current vendors actually sit versus the bar.",
+    accent: "from-slate-700 via-slate-600 to-slate-500",
+    eyebrow: "Category · Production",
+    systemPrompt: buildCategoryPrompt(
+      "Production-grade bar for the category.",
+      "Define the bar (latency, accuracy, reliability, ops burden) with named numeric thresholds. Then table the leading vendors against each threshold with REAL / PARTIAL / ILLUSION tags. Close with a unit-economics block estimating cost behavior at 3x and 10x volume.",
+    ),
+    userPromptIntro:
+      "Produce the Category Production Reality report for the AI category described below.",
+  },
+  {
+    id: "category_open_unknowns",
+    subject_kind: "category",
+    title: "Category Open Questions & Unknowns",
+    tagline: "What we don't yet know — and what would settle it",
+    description:
+      "Honest inventory of the open questions in the category: ranks them by decision impact, names the artifact or test that would close each, and tags which are knowable in 30 / 90 / 180 days.",
+    accent: "from-fuchsia-600 via-purple-500 to-indigo-500",
+    eyebrow: "Category · Unknowns",
+    systemPrompt: buildCategoryPrompt(
+      "Unresolved category-level questions.",
+      "Render a ranked open-questions table (Question | Decision Impact 1-5 | Confidence Today | Artifact That Would Close It | Time-to-Close 30/90/180 | Owner Type). Below the table write a 'Cheapest decisive next step' paragraph naming the single artifact request with the highest impact-per-day.",
+    ),
+    userPromptIntro:
+      "Produce the Category Open Questions & Unknowns report for the AI category described below.",
+  },
+  {
+    id: "category_investor_diligence_traps",
+    subject_kind: "category",
+    title: "Category Investor Diligence Traps",
+    tagline: "Where smart investors lose money in this category",
+    description:
+      "Red-team list of the patterns that have repeatedly burned investors in adjacent or precedent categories — narrative substitution, distribution illusion, model-cost arbitrage, governance debt, single-customer concentration.",
+    accent: "from-orange-600 via-red-500 to-rose-600",
+    eyebrow: "Category · Traps",
+    systemPrompt: buildCategoryPrompt(
+      "Recurring failure patterns for investors in this category and its precedents.",
+      "Produce 6-8 named traps. For each: a one-sentence description, one named precedent (deal or category) where the trap fired, the diligence question that would have caught it, and a Severity tag.",
+    ),
+    userPromptIntro:
+      "Produce the Category Investor Diligence Traps report for the AI category described below.",
+  },
+  {
+    id: "category_target_screening_criteria",
+    subject_kind: "category",
+    title: "Category → Target Screening Criteria",
+    tagline: "Turn the category read into a screening rubric",
+    description:
+      "Converts the category diligence into a concrete screening rubric for sourcing individual targets: must-have criteria, disqualifiers, scoring weights, and the order-of-operations for first-pass evaluation.",
+    accent: "from-teal-600 via-emerald-500 to-green-500",
+    eyebrow: "Category · Screening",
+    systemPrompt: buildCategoryPrompt(
+      "Category insights → target-level screening rubric.",
+      "Section 1: 5-7 must-have criteria (each with a measurable threshold). Section 2: 3-5 immediate disqualifiers. Section 3: scoring weights table totalling 100. Section 4: first-pass evaluation playbook in 5 ordered steps. End with a Decision line on whether the rubric is tight enough to action this quarter.",
+    ),
+    userPromptIntro:
+      "Produce the Category → Target Screening Criteria for the AI category described below.",
+  },
+  {
+    id: "category_coverage_confidence_summary",
+    subject_kind: "category",
+    title: "Category Coverage & Confidence Summary",
+    tagline: "Self-audit of the category diligence itself",
+    description:
+      "Self-critical audit of the evidence underpinning the category report: artifact inventory, coverage by dimension, 0-100% confidence scoring, unsupported conclusions, critical gaps, and a reliability verdict.",
+    accent: "from-slate-700 via-slate-600 to-slate-500",
+    eyebrow: "Category · Coverage",
+    systemPrompt: buildCategoryPrompt(
+      "Self-audit of the category diligence evidence base.",
+      "Produce: (1) artifact inventory by type (market_map / analyst_note / expert_memo / pricing_page / product_screenshot_set / vendor_survey / regulatory_citation) with counts and recency; (2) coverage table by scoring dimension with 0-100% confidence; (3) unsupported conclusions list; (4) critical gaps ranked by decision impact; (5) overall reliability verdict (Decision-Ready / Directional Only / Not Reliable) with the one artifact request that would flip it.",
+    ),
+    userPromptIntro:
+      "Produce the Category Coverage & Confidence Summary for the AI category described below.",
+  },
+];
+
+/**
+ * Subject-aware accessor for the report catalog. Returns the full target
+ * catalog when called with 'target' (or with no argument), and only the
+ * category catalog when called with 'category'. Existing callers that read
+ * `ADVANCED_REPORTS` directly continue to see the original target list.
+ */
+export function getAdvancedReportsForSubject(
+  subjectKind: import("@/lib/types").SubjectKind = "target",
+): AdvancedReportConfig[] {
+  if (subjectKind === "category") return CATEGORY_ADVANCED_REPORTS;
+  return ADVANCED_REPORTS;
+}
+
+/**
+ * Lookup that spans both catalogs — useful for endpoints that already
+ * have a report id and need its config without knowing the subject.
+ */
+export function getAdvancedReportConfigAnySubject(
+  id: string,
+): AdvancedReportConfig | null {
+  return (
+    ADVANCED_REPORTS.find((r) => r.id === id) ??
+    CATEGORY_ADVANCED_REPORTS.find((r) => r.id === id) ??
+    null
+  );
 }

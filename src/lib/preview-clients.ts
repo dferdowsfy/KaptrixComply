@@ -18,6 +18,10 @@ export type PreviewClientSummary = {
   fee_usd: number;
   deadline: string; // ISO date
   summary: string;
+  // AI Category Diligence flag. Omitted = target-mode (default).
+  // When 'category', the preview/report page swaps the report catalog
+  // to the category-mode set via getAdvancedReportsForSubject.
+  subject_kind?: "target" | "category";
 };
 
 export const PREVIEW_CLIENTS: PreviewClientSummary[] = [

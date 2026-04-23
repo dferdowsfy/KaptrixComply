@@ -70,6 +70,15 @@ export async function PUT(request: NextRequest) {
     .eq("sub_criterion", sub_criterion)
     .maybeSingle();
 
+  // AI Category Diligence: stamp the parent engagement's subject_kind
+  // so the trigger on scores can enforce cross-mode integrity.
+  const { data: parentEng } = await supabase
+    .from("engagements")
+    .select("subject_kind")
+    .eq("id", engagement_id)
+    .maybeSingle();
+  const subjectKind = parentEng?.subject_kind ?? null;
+
   // Upsert the score
   const { data, error } = await supabase
     .from("scores")
@@ -80,6 +89,7 @@ export async function PUT(request: NextRequest) {
         sub_criterion,
         ...scoreData,
         updated_by: user.id,
+        ...(subjectKind ? { subject_kind: subjectKind } : {}),
       },
       { onConflict: "engagement_id,dimension,sub_criterion" },
     )
