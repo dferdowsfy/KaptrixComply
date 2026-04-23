@@ -11,6 +11,7 @@ import {
   aggregateContextAdjustment,
   type ContextSignal,
 } from "@/lib/scoring/context";
+import type { SubCriterionEngineOutput } from "@/lib/scoring/engine-types";
 import { KNOWLEDGE_STEP_LABELS } from "@/lib/preview/knowledge-base";
 import { GenerateButton } from "@/components/preview/generate-button";
 import type {
@@ -48,6 +49,13 @@ interface Props {
   onForceResync?: () => void;
   /** Whether the scoring KB entry is stale and needs recompute. */
   scoringStale?: boolean;
+  /**
+   * Deterministic engine outputs keyed by `${dimension}.${sub_criterion}`.
+   * When supplied, each sub-criterion row renders a source indicator
+   * (intake_only / artifact_supported / artifact_only / contradictory /
+   * insufficient), a confidence badge, and a contradiction flag.
+   */
+  engineMetadataBySub?: Record<string, SubCriterionEngineOutput>;
 }
 
 export function ScoringPanel({
@@ -64,6 +72,7 @@ export function ScoringPanel({
   onScoresChange,
   onForceResync,
   scoringStale = false,
+  engineMetadataBySub,
 }: Props) {
   const [scores, setScores] = useState<Score[]>(initialScores);
   const [expandedDimension, setExpandedDimension] = useState<ScoreDimension | null>(
@@ -362,6 +371,8 @@ export function ScoringPanel({
                 const existing = scores.find(
                   (s) => s.dimension === dim.key && s.sub_criterion === sub.key,
                 );
+                const engineMeta =
+                  engineMetadataBySub?.[`${dim.key}.${sub.key}`];
                 return (
                   <SubCriterionInput
                     key={sub.key}
@@ -375,6 +386,7 @@ export function ScoringPanel({
                     onSave={saveScore}
                     onScoreChange={updateLocalScore}
                     contextSignals={contextSignals}
+                    engineMetadata={engineMeta}
                   />
                 );
               })}
@@ -392,6 +404,98 @@ function getActiveBand(bands: ScoreBand[] | undefined, score: number): ScoreBand
   return bands.find((b) => score <= b.max) ?? bands[bands.length - 1];
 }
 
+// ── Engine source indicators ─────────────────────────────────────────
+//
+// Renders the deterministic scoring engine's per-sub-criterion
+// provenance: where the score came from (intake, artifacts, both,
+// contradictory, or insufficient), confidence level, and whether a
+// contradiction between intake and artifact evidence was detected.
+
+const SOURCE_MIX_META: Record<
+  SubCriterionEngineOutput["source_mix"],
+  { label: string; cls: string; description: string }
+> = {
+  insufficient: {
+    label: "Insufficient evidence",
+    cls: "bg-slate-100 text-slate-700 ring-slate-200",
+    description: "No intake or artifact evidence for this sub-criterion.",
+  },
+  intake_only: {
+    label: "Intake only",
+    cls: "bg-amber-50 text-amber-800 ring-amber-200",
+    description:
+      "Score derived from intake responses only. Bounded to [1.5, 3.5]; LOW confidence.",
+  },
+  artifact_only: {
+    label: "Artifact only",
+    cls: "bg-sky-50 text-sky-800 ring-sky-200",
+    description: "Score derived from artifact evidence only (no intake signal).",
+  },
+  artifact_supported: {
+    label: "Artifact supported",
+    cls: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+    description: "Intake responses are validated by artifact evidence.",
+  },
+  contradictory: {
+    label: "Contradictory",
+    cls: "bg-rose-50 text-rose-800 ring-rose-200",
+    description: "Artifact evidence contradicts intake — artifact takes priority.",
+  },
+};
+
+const CONFIDENCE_META: Record<
+  SubCriterionEngineOutput["confidence"],
+  { label: string; cls: string }
+> = {
+  LOW: { label: "Conf: LOW", cls: "bg-slate-100 text-slate-700 ring-slate-200" },
+  MEDIUM: {
+    label: "Conf: MEDIUM",
+    cls: "bg-indigo-50 text-indigo-800 ring-indigo-200",
+  },
+  HIGH: {
+    label: "Conf: HIGH",
+    cls: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  },
+};
+
+function EngineSourceBadges({ meta }: { meta: SubCriterionEngineOutput }) {
+  const src = SOURCE_MIX_META[meta.source_mix];
+  const conf = CONFIDENCE_META[meta.confidence];
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" title={src.description}>
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${src.cls}`}
+      >
+        {src.label}
+      </span>
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${conf.cls}`}
+      >
+        {conf.label}
+      </span>
+      {meta.contradiction_flag && (
+        <span
+          className="inline-flex items-center rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-semibold text-white"
+          title="Artifact evidence directly contradicts intake claim."
+        >
+          ⚠ Contradiction
+        </span>
+      )}
+      {meta.evidence_references.length > 0 && (
+        <span
+          className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-inset ring-slate-200"
+          title={meta.evidence_references.join(", ")}
+        >
+          {meta.evidence_references.length} evidence ref(s)
+        </span>
+      )}
+      <span className="text-[11px] font-medium text-slate-500">
+        Engine: {meta.score.toFixed(1)}
+      </span>
+    </div>
+  );
+}
+
 function SubCriterionInput({
   dimension,
   subKey,
@@ -403,6 +507,7 @@ function SubCriterionInput({
   onSave,
   onScoreChange,
   contextSignals = [],
+  engineMetadata,
 }: {
   dimension: string;
   subKey: string;
@@ -423,6 +528,7 @@ function SubCriterionInput({
     score: number,
   ) => void;
   contextSignals?: ContextSignal[];
+  engineMetadata?: SubCriterionEngineOutput;
 }) {
   const [score, setScore] = useState(initialScore);
   const [rationale, setRationale] = useState(initialRationale);
@@ -457,6 +563,9 @@ function SubCriterionInput({
         <p className="text-sm font-medium text-gray-900">{name}</p>
         <p className="text-xs text-gray-500">{description}</p>
       </div>
+      {engineMetadata && (
+        <EngineSourceBadges meta={engineMetadata} />
+      )}
       <div className="flex items-center gap-4">
         <input
           type="range"

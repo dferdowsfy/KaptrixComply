@@ -33,6 +33,10 @@ import {
   deriveContextSignals,
 } from "@/lib/scoring/context";
 import { calculateCompositeScore, deriveDecision } from "@/lib/scoring/calculator";
+import { runScoringEngine, engineOutputToScores } from "@/lib/scoring/engine";
+import { buildEngineInputFromPreview } from "@/lib/scoring/engine-preview-adapter";
+import type { SubCriterionEngineOutput } from "@/lib/scoring/engine-types";
+import type { IntakePayload, PreAnalysisPayload } from "@/lib/preview/kb-format";
 import { startScoreRun, useScoreRunStore } from "@/lib/scoring/score-run-store";
 import { useSelectedPreviewClient } from "@/hooks/use-selected-preview-client";
 import { usePreviewSnapshot } from "@/hooks/use-preview-data";
@@ -137,6 +141,46 @@ export default function PreviewScoringPage() {
   );
 
   const contextSignals = deriveContextSignals(currentContextSlice(kb, "scoring"));
+
+  // ── Deterministic Scoring Engine ─────────────────────────────────
+  //
+  // The engine is pure and runs client-side on every render. It is
+  // the authoritative deterministic scoring path: same inputs always
+  // produce the same scores, source_mix, confidence, and contradiction
+  // flags. The LLM suggestion path below is preserved for draft
+  // rationale assistance only.
+  const engineOutput = useMemo(() => {
+    const intakeEntry = kb.intake;
+    const preAnalysisEntry = kb.pre_analysis;
+    const intakePayload =
+      intakeEntry?.payload.kind === "intake"
+        ? (intakeEntry.payload as IntakePayload)
+        : null;
+    const preAnalysisPayload =
+      preAnalysisEntry?.payload.kind === "pre_analysis"
+        ? (preAnalysisEntry.payload as PreAnalysisPayload)
+        : null;
+    return runScoringEngine(
+      buildEngineInputFromPreview({
+        intake: intakePayload,
+        preAnalysis: preAnalysisPayload,
+        uploadedDocs,
+        extractedInsights,
+      }),
+    );
+  }, [kb, uploadedDocs, extractedInsights]);
+
+  const engineMetadataBySub = useMemo(() => {
+    const map: Record<string, SubCriterionEngineOutput> = {};
+    for (const s of engineOutput.sub_criteria) map[s.name] = s;
+    return map;
+  }, [engineOutput]);
+
+  const hasEngineEvidence = engineOutput.sub_criteria.some(
+    (s) => s.source_mix !== "insufficient",
+  );
+
+
   const submittedSteps = (Object.keys(kb) as KnowledgeStep[]).filter((k) => kb[k]);
   const missingSteps = (
     ["intake", "coverage", "insights", "pre_analysis"] as KnowledgeStep[]
@@ -283,8 +327,19 @@ export default function PreviewScoringPage() {
 
   // (cache restore is now handled synchronously via useMemo above)
 
-  // The scores passed to the panel: LLM suggestions if available, otherwise snapshot.
-  const panelScores = suggestedScores ?? (snapshot?.scores ?? []);
+  // Panel scores: LLM suggestions > engine output (deterministic) > snapshot.
+  // The engine always produces a complete 24-item scorecard from the
+  // current intake + artifact state, so the panel is never empty as
+  // long as any intake or artifact evidence exists.
+  const engineScores = useMemo(
+    () =>
+      hasEngineEvidence
+        ? engineOutputToScores(engagement.id, engineOutput)
+        : [],
+    [engagement.id, engineOutput, hasEngineEvidence],
+  );
+  const panelScores =
+    suggestedScores ?? (engineScores.length > 0 ? engineScores : snapshot?.scores ?? []);
   const upstreamChanged =
     (scoringDirty.dirty && suggestedScores !== null) || inputsChanged;
 
@@ -360,7 +415,13 @@ export default function PreviewScoringPage() {
         </div>
       </div>
 
-      {!suggestedScores && !(snapshot?.scores?.length) && !loading && (
+      {/* Deterministic engine summary — always visible when any
+          intake or artifact evidence exists. */}
+      {hasEngineEvidence && (
+        <EngineSourceSummary output={engineOutput} />
+      )}
+
+      {!suggestedScores && !hasEngineEvidence && !(snapshot?.scores?.length) && !loading && (
         <div className="rounded-2xl border border-slate-100 bg-slate-50 py-10 text-center">
           <p className="text-sm font-medium text-slate-600">No scores generated yet.</p>
           <p className="mt-1 text-xs text-slate-400">
@@ -391,7 +452,7 @@ export default function PreviewScoringPage() {
         </p>
       )}
 
-      {(suggestedScores || snapshot?.scores) && !loading && (
+      {(suggestedScores || hasEngineEvidence || snapshot?.scores) && !loading && (
         <ScoringPanel
           engagementId={engagement.id}
           scores={panelScores}
@@ -401,6 +462,7 @@ export default function PreviewScoringPage() {
           status={engagement.status}
           analyses={analyses}
           contextSignals={contextSignals}
+          engineMetadataBySub={engineMetadataBySub}
           previewMode
           scoringStale={upstreamChanged}
           onForceResync={() => void run()}
@@ -417,6 +479,105 @@ export default function PreviewScoringPage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ── Engine source summary banner ─────────────────────────────────────
+//
+// Aggregates the deterministic engine output into a single at-a-glance
+// panel so the operator can see where scores are coming from without
+// expanding every dimension. Renders source-mix counts + a stable
+// inputs hash (same inputs → same hash → same scores, always).
+
+function EngineSourceSummary({
+  output,
+}: {
+  output: ReturnType<typeof runScoringEngine>;
+}) {
+  const counts: Record<SubCriterionEngineOutput["source_mix"], number> = {
+    insufficient: 0,
+    intake_only: 0,
+    artifact_only: 0,
+    artifact_supported: 0,
+    contradictory: 0,
+  };
+  let contradictions = 0;
+  let lowConf = 0;
+  let highConf = 0;
+  for (const s of output.sub_criteria) {
+    counts[s.source_mix]++;
+    if (s.contradiction_flag) contradictions++;
+    if (s.confidence === "LOW") lowConf++;
+    if (s.confidence === "HIGH") highConf++;
+  }
+  const total = output.sub_criteria.length;
+
+  return (
+    <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 text-xs shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-indigo-900">
+            Deterministic scoring engine
+          </p>
+          <p className="mt-0.5 text-[11px] text-indigo-700">
+            Same intake + artifacts produce the same scores, every time. Source
+            indicators appear on each sub-criterion below.
+          </p>
+        </div>
+        <span
+          className="shrink-0 rounded-full bg-white px-2 py-0.5 font-mono text-[10px] text-indigo-700 ring-1 ring-indigo-200"
+          title="SHA-256 of canonical inputs. Identical hash = identical output."
+        >
+          hash {output.inputs_hash.slice(0, 10)}…
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <SummaryChip label="Artifact supported" value={counts.artifact_supported} total={total} tone="emerald" />
+        <SummaryChip label="Artifact only" value={counts.artifact_only} total={total} tone="sky" />
+        <SummaryChip label="Intake only" value={counts.intake_only} total={total} tone="amber" />
+        <SummaryChip label="Contradictory" value={counts.contradictory} total={total} tone="rose" />
+        <SummaryChip label="Insufficient" value={counts.insufficient} total={total} tone="slate" />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-indigo-900">
+        <span>
+          <strong>{highConf}</strong> HIGH · <strong>{total - highConf - lowConf}</strong> MEDIUM · <strong>{lowConf}</strong> LOW confidence
+        </span>
+        {contradictions > 0 && (
+          <span className="font-semibold text-rose-700">
+            ⚠ {contradictions} contradiction(s) surfaced
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SummaryChip({
+  label,
+  value,
+  total,
+  tone,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  tone: "emerald" | "sky" | "amber" | "rose" | "slate";
+}) {
+  const cls = {
+    emerald: "bg-emerald-50 text-emerald-900 ring-emerald-200",
+    sky: "bg-sky-50 text-sky-900 ring-sky-200",
+    amber: "bg-amber-50 text-amber-900 ring-amber-200",
+    rose: "bg-rose-50 text-rose-900 ring-rose-200",
+    slate: "bg-slate-50 text-slate-800 ring-slate-200",
+  }[tone];
+  return (
+    <div className={`rounded-lg px-2 py-1.5 ring-1 ring-inset ${cls}`}>
+      <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">{label}</p>
+      <p className="text-sm font-semibold">
+        {value}
+        <span className="text-[10px] font-normal opacity-60"> / {total}</span>
+      </p>
     </div>
   );
 }
