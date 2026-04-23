@@ -103,6 +103,8 @@ export function uploadAndParse(file: File, meta: UploadedDoc): Promise<void> {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              client_id: clientId,
+              doc_id: meta.id,
               filename: meta.filename,
               category: meta.category,
               text: parsedText,

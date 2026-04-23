@@ -16,10 +16,11 @@ import {
 import { llmChat } from "@/lib/llm/client";
 import { openRouterChat, getOpenRouterModel } from "@/lib/llm/openrouter";
 import { requireAuth, authErrorResponse } from "@/lib/security/authz";
+import { getServiceClient } from "@/lib/supabase/service";
 import type { KnowledgeInsight } from "@/components/documents/knowledge-insights-panel";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const CATEGORIES = [
   "commercial",
@@ -61,6 +62,8 @@ Return ONLY valid JSON, no prose:
 }`;
 
 interface ExtractBody {
+  client_id?: string;
+  doc_id?: string;
   filename?: string;
   category?: string;
   text?: string;
@@ -88,7 +91,7 @@ async function callLlm(
       maxTokens: 1200,
       model: getSelfHostedLlmModelForTask("report"),
       jsonMode: true,
-      timeoutMs: 90_000,
+      timeoutMs: 180_000,
     });
     return result.content;
   }
@@ -102,12 +105,52 @@ async function callLlm(
       temperature: 0.1,
       maxTokens: 1200,
       jsonMode: true,
-      timeoutMs: 90_000,
+      timeoutMs: 180_000,
     });
     return result.content;
   }
   throw new Error(
     "No LLM provider configured. Set SELF_HOSTED_LLM_BASE_URL or OPENROUTER_API_KEY.",
+  );
+}
+
+async function resolveDocumentInput(body: ExtractBody): Promise<{
+  filename: string;
+  category?: string;
+  text: string;
+}> {
+  const fallbackText = (body.text ?? "").trim();
+
+  if (body.client_id && body.doc_id) {
+    const supabase = getServiceClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("preview_uploaded_docs")
+        .select("filename, category, parsed_text")
+        .eq("client_id", body.client_id)
+        .eq("id", body.doc_id)
+        .maybeSingle();
+
+      if (!error && data?.parsed_text?.trim()) {
+        return {
+          filename: body.filename ?? data.filename,
+          category: body.category ?? data.category,
+          text: data.parsed_text.trim(),
+        };
+      }
+    }
+  }
+
+  if (body.filename && fallbackText) {
+    return {
+      filename: body.filename,
+      category: body.category,
+      text: fallbackText,
+    };
+  }
+
+  throw new Error(
+    "Missing required fields: either (client_id + doc_id) for a persisted artifact or (filename + text) for direct extraction.",
   );
 }
 
@@ -125,17 +168,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { filename, category, text } = body;
-
-  if (!filename || !text) {
+  let filename: string;
+  let category: string | undefined;
+  let text: string;
+  try {
+    ({ filename, category, text } = await resolveDocumentInput(body));
+  } catch (err) {
     return NextResponse.json(
-      { error: "Missing required fields: filename, text" },
+      { error: err instanceof Error ? err.message : "Invalid extraction input" },
       { status: 400 },
     );
   }
 
-  // Cap text to avoid excessive token usage. ~6000 chars ≈ 1500 tokens.
-  const cappedText = text.length > 8000 ? text.slice(0, 8000) + "\n[…truncated]" : text;
+  // Keep the extraction prompt compact enough to remain reliable on
+  // slower models / providers while still carrying enough document body
+  // for high-signal diligence insights.
+  const cappedText = text.length > 7000 ? text.slice(0, 7000) + "\n[…truncated]" : text;
 
   const slug = makeSlug(filename);
   const userMessage = `Document: "${filename}" (category: ${category ?? "unknown"})

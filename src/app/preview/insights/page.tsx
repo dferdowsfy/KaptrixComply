@@ -29,6 +29,7 @@ import {
   upsertUploadedDoc,
   type UploadedDoc,
 } from "@/lib/preview/uploaded-docs";
+import type { Document } from "@/lib/types";
 
 const REMOVED_STORAGE_PREFIX = "kaptrix.preview.insights.removed:";
 
@@ -76,6 +77,31 @@ export default function PreviewInsightsPage() {
     () => readUploadedDocs(selectedId),
     () => [] as readonly UploadedDoc[],
   );
+
+  const extractionDocs = useMemo<UploadedDoc[]>(() => {
+    if (!selectedId) return [];
+
+    const byId = new Map<string, UploadedDoc>();
+
+    const fromSnapshot = documents.map((doc: Document) => ({
+      id: doc.id,
+      client_id: selectedId,
+      filename: doc.filename,
+      category: doc.category,
+      mime_type: doc.mime_type ?? "application/octet-stream",
+      file_size_bytes: doc.file_size_bytes ?? 0,
+      uploaded_at: doc.uploaded_at,
+      parse_status: doc.parse_status,
+      parsed_text: doc.parsed_text ?? undefined,
+      token_count: doc.token_count ?? undefined,
+      error: doc.parse_error ?? undefined,
+    }));
+
+    for (const doc of fromSnapshot) byId.set(doc.id, doc);
+    for (const doc of uploadedDocs) byId.set(doc.id, doc);
+
+    return [...byId.values()];
+  }, [selectedId, documents, uploadedDocs]);
 
   // Merge: snapshot first, then any newly extracted insights not already
   // present (de-duplicated by id so we never show the same insight twice).
@@ -193,7 +219,7 @@ export default function PreviewInsightsPage() {
     const haveByPrefix = new Set(
       extractedInsights.map((i) => i.id.replace(/-\d+$/, "")),
     );
-    return uploadedDocs.filter((d) => {
+    return extractionDocs.filter((d) => {
       if (!d.parsed_text || !d.parsed_text.trim()) return false;
       if (d.parse_status === "failed") return false;
       const slug = d.filename
@@ -204,13 +230,13 @@ export default function PreviewInsightsPage() {
       const prefix = `ext-${slug}`;
       return !haveByPrefix.has(prefix);
     });
-  }, [uploadedDocs, extractedInsights]);
+  }, [extractionDocs, extractedInsights]);
 
   const runExtraction = useCallback(
     async (force: boolean) => {
       if (!selectedId) return;
       const targets = force
-        ? uploadedDocs.filter((d) => d.parsed_text && d.parsed_text.trim())
+        ? extractionDocs.filter((d) => d.parsed_text && d.parsed_text.trim())
         : docsMissingInsights;
       if (targets.length === 0) {
         setExtractState((s) => ({ ...s, error: "No documents need extraction." }));
@@ -232,6 +258,8 @@ export default function PreviewInsightsPage() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              client_id: selectedId,
+              doc_id: doc.id,
               filename: doc.filename,
               category: doc.category,
               text: doc.parsed_text,
@@ -275,7 +303,7 @@ export default function PreviewInsightsPage() {
         lastRunAt: new Date().toISOString(),
       });
     },
-    [selectedId, uploadedDocs, docsMissingInsights],
+    [selectedId, extractionDocs, docsMissingInsights],
   );
 
   return (
@@ -295,8 +323,8 @@ export default function PreviewInsightsPage() {
               ? `Extracting — ${extractState.processed}/${extractState.total} documents…`
               : docsMissingInsights.length > 0
                 ? `${docsMissingInsights.length} uploaded document${docsMissingInsights.length === 1 ? "" : "s"} waiting for insight extraction.`
-                : uploadedDocs.length > 0
-                  ? `All ${uploadedDocs.length} uploaded document${uploadedDocs.length === 1 ? " has" : "s have"} been processed.`
+                : extractionDocs.length > 0
+                  ? `All ${extractionDocs.length} uploaded document${extractionDocs.length === 1 ? " has" : "s have"} been processed.`
                   : "No uploaded documents yet — drop files on the Evidence & Coverage page."}
             {extractState.error && !extractState.running ? (
               <span className="ml-1 text-rose-600">
@@ -322,7 +350,7 @@ export default function PreviewInsightsPage() {
         <button
           type="button"
           onClick={() => runExtraction(true)}
-          disabled={extractState.running || uploadedDocs.length === 0}
+          disabled={extractState.running || extractionDocs.length === 0}
           className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:border-gray-400 disabled:cursor-not-allowed disabled:opacity-50"
           title="Re-run extraction on every parsed document"
         >
