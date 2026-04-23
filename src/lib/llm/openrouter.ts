@@ -55,7 +55,7 @@ export interface OpenRouterResult {
  * @deprecated Use getOpenRouterModel("report") instead. Kept for
  * backward compatibility with existing imports.
  */
-export const OPENROUTER_REPORT_MODEL = "openai/gpt-5-nano";
+export const OPENROUTER_REPORT_MODEL = "openai/gpt-4o-mini";
 
 /** Resolve the OpenRouter model slug for a given Kaptrix workload. */
 export function getOpenRouterModel(task: OpenRouterTask): string {

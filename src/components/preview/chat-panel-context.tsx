@@ -12,16 +12,25 @@ import {
 type ChatPanelCtx = {
   open: boolean;
   setOpen: Dispatch<SetStateAction<boolean>>;
+  fullscreen: boolean;
+  setFullscreen: Dispatch<SetStateAction<boolean>>;
 };
 
 const Ctx = createContext<ChatPanelCtx>({
   open: false,
   setOpen: () => {},
+  fullscreen: false,
+  setFullscreen: () => {},
 });
 
 export function ChatPanelProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  return <Ctx.Provider value={{ open, setOpen }}>{children}</Ctx.Provider>;
+  const [fullscreen, setFullscreen] = useState(false);
+  return (
+    <Ctx.Provider value={{ open, setOpen, fullscreen, setFullscreen }}>
+      {children}
+    </Ctx.Provider>
+  );
 }
 
 export function useChatPanel() {

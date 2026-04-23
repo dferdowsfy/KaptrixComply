@@ -91,14 +91,14 @@ export function getOpenRouterZeroRetention(): boolean {
  * the app works out of the box.
  *
  * Env var names and defaults:
- *   OPENROUTER_MODEL_EXTRACT    → openai/gpt-oss-20b      (insight extraction from uploaded docs)
- *   OPENROUTER_MODEL_SCORING    → openai/gpt-5-nano       (6-dimension scoring fan-out)
- *   OPENROUTER_MODEL_REPORT     → openai/gpt-5-nano       (report generation)
- *   OPENROUTER_MODEL_POSITIONING→ openai/gpt-5-nano       (positioning analysis)
- *   OPENROUTER_MODEL_CHAT       → openai/gpt-oss-20b      (chat / Harvey assistant)
- *   OPENROUTER_MODEL_GUIDANCE   → openai/gpt-oss-20b      (scoring guidance popups)
+ *   OPENROUTER_MODEL_EXTRACT    → openai/gpt-4o-mini      (insight extraction from uploaded docs)
+ *   OPENROUTER_MODEL_SCORING    → openai/gpt-4o-mini      (6-dimension scoring fan-out)
+ *   OPENROUTER_MODEL_REPORT     → openai/gpt-4o-mini      (report generation)
+ *   OPENROUTER_MODEL_POSITIONING→ openai/gpt-4o-mini      (positioning analysis)
+ *   OPENROUTER_MODEL_CHAT       → openai/gpt-4o-mini      (chat / Harvey assistant)
+ *   OPENROUTER_MODEL_GUIDANCE   → openai/gpt-4o-mini      (scoring guidance popups)
  *   OPENROUTER_MODEL_VISION     → google/gemma-3-27b-it   (image / diagram OCR)
- *   OPENROUTER_MODEL_DEFAULT    → openai/gpt-oss-20b      (fallback when a task var is unset)
+ *   OPENROUTER_MODEL_DEFAULT    → openai/gpt-4o-mini      (fallback when a task var is unset)
  */
 export type OpenRouterTask =
   | "extract"
@@ -110,12 +110,12 @@ export type OpenRouterTask =
   | "vision";
 
 const OPENROUTER_TASK_DEFAULTS: Record<OpenRouterTask, string> = {
-  extract: "openai/gpt-oss-20b",
-  scoring: "openai/gpt-5-nano",
-  report: "openai/gpt-5-nano",
-  positioning: "openai/gpt-5-nano",
-  chat: "openai/gpt-oss-20b",
-  guidance: "openai/gpt-oss-20b",
+  extract: "openai/gpt-4o-mini",
+  scoring: "openai/gpt-4o-mini",
+  report: "openai/gpt-4o-mini",
+  positioning: "openai/gpt-4o-mini",
+  chat: "openai/gpt-4o-mini",
+  guidance: "openai/gpt-4o-mini",
   vision: "google/gemma-3-27b-it",
 };
 

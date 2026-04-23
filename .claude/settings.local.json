@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "WebFetch(domain:openrouter.ai)",
+      "WebSearch",
+      "WebFetch(domain:checkthat.ai)",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models\" -o /tmp/or_models.json)",
+      "Bash(python3)"
+    ]
+  }
+}

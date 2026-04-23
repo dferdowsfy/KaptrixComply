@@ -187,12 +187,12 @@ export function PreviewShell({
       <div className="flex min-h-0 flex-1">
         <main
           className={`min-w-0 flex-1 px-4 py-6 pb-28 transition-all duration-300 sm:px-6 sm:py-8 sm:pb-24 ${
-            chatCtx.open && chatPanel ? "md:pr-[440px]" : ""
+            chatCtx.open && chatPanel && !chatCtx.fullscreen ? "md:pr-[440px]" : ""
           }`}
         >
           <div
             className={`mx-auto transition-all duration-300 ${
-              chatCtx.open && chatPanel ? "max-w-5xl" : "max-w-7xl"
+              chatCtx.open && chatPanel && !chatCtx.fullscreen ? "max-w-5xl" : "max-w-7xl"
             }`}
           >
             {children}
@@ -201,7 +201,11 @@ export function PreviewShell({
 
         {chatPanel && (
           <aside
-            className={`print-hide fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-slate-200 bg-slate-900 shadow-xl transition-transform duration-300 md:w-[420px] ${
+            className={`print-hide fixed z-50 flex flex-col bg-slate-900 shadow-xl transition-all duration-300 ${
+              chatCtx.fullscreen
+                ? "inset-0 w-full border-l-0"
+                : "inset-y-0 right-0 w-full border-l border-slate-200 md:w-[420px]"
+            } ${
               chatCtx.open
                 ? "translate-x-0"
                 : "pointer-events-none translate-x-full"
