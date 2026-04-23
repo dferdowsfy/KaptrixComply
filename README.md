@@ -79,7 +79,7 @@ Copy `.env.example` to `.env.local` for local dev. On Vercel, add each of these 
 
 | Variable | Where | Description |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | client + server | `https://qaqolwkdmsmokztitqty.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_URL` | client + server | `https://amqzwqyjqgvrapjtgunp.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client + server | JWT anon key |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | client + server | Newer `sb_publishable_…` key (optional) |
 | `SUPABASE_SERVICE_ROLE_KEY` | **server only** | JWT service role (used for seeding + chat persistence) |
