@@ -22,6 +22,17 @@ export default function PreviewHomePage() {
     router.push("/preview/intake");
   };
 
+  const deleteClient = async (id: string, name: string) => {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    const res = await fetch(`/api/engagements/${id}`, { method: "DELETE" });
+    if (res.ok || res.status === 204) {
+      void refresh();
+    } else {
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      alert(body.error ?? "Failed to delete engagement.");
+    }
+  };
+
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* AI Category Diligence — renders only when the signed-in user has
@@ -68,6 +79,11 @@ export default function PreviewHomePage() {
               client={c}
               isSelected={c.id === selectedId}
               onOpen={() => openClient(c.id)}
+              onDelete={
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.id)
+                  ? () => void deleteClient(c.id, c.target)
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -307,10 +323,12 @@ function ClientCard({
   client,
   isSelected,
   onOpen,
+  onDelete,
 }: {
   client: PreviewClientSummary;
   isSelected: boolean;
   onOpen: () => void;
+  onDelete?: () => void;
 }) {
   const statusTone = statusToTone(client.status);
 
@@ -350,6 +368,18 @@ function ClientCard({
           >
             {client.status_label}
           </div>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="rounded-md p-1 text-slate-300 transition hover:bg-rose-50 hover:text-rose-500"
+              title="Delete engagement"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
