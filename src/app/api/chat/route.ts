@@ -325,15 +325,26 @@ export async function POST(req: Request) {
   // (full pitch deck text), so allow up to 24k chars here.
   const kbText = (body.knowledge_base ?? "").slice(0, 24_000);
 
+  // Priority order: KB/intake first (highest signal), then snapshot
+  // metadata + uploaded docs, then client-assembled corpus. The 72k
+  // budget is split to guarantee the high-priority blocks always land:
+  //   workspaceContext : up to 20k (intake + KB steps)
+  //   kbText           : up to 24k (client-submitted — includes intake if KB built)
+  //   snapshotContext  : up to 20k (engagement metadata + uploaded doc excerpts)
+  //   callerContext    : remainder (scored corpus, analyses, etc.)
+  const workspaceBudget = workspaceContext.slice(0, 20_000);
+  const snapshotBudget = snapshotContext.slice(0, 20_000);
+  const callerBudget = callerContext.slice(0, 16_000);
+
   let context = [
-    snapshotContext,
-    workspaceContext && `--- ENGAGEMENT KNOWLEDGE BASE (from Supabase) ---\n${workspaceContext}`,
-    callerContext && `--- CLIENT-ASSEMBLED EVIDENCE ---\n${callerContext}`,
-    kbText && `--- OPERATOR-SUBMITTED KNOWLEDGE BASE ---\n${kbText}`,
+    workspaceBudget && `--- ENGAGEMENT KNOWLEDGE BASE ---\n${workspaceBudget}`,
+    kbText && `--- OPERATOR KNOWLEDGE BASE ---\n${kbText}`,
+    snapshotBudget && `--- ENGAGEMENT SNAPSHOT ---\n${snapshotBudget}`,
+    callerBudget && `--- EVIDENCE CORPUS ---\n${callerBudget}`,
   ]
     .filter(Boolean)
     .join("\n\n")
-    .slice(0, 64_000);
+    .slice(0, 80_000);
 
   const useOpenRouter = isOpenRouterConfigured();
   if (!useOpenRouter && !isSelfHostedLlmConfigured()) {

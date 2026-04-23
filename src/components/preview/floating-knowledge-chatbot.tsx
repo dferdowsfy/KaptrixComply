@@ -74,6 +74,24 @@ export function KnowledgeChatPanel() {
   const { client, selectedId } = useSelectedPreviewClient();
   const { snapshot } = usePreviewSnapshot(selectedId);
 
+  // Fetch the user's raw intake answers directly from the API so the
+  // chatbot always has them even if the KB sync to Supabase failed.
+  const [intakeAnswers, setIntakeAnswers] = useState<Record<string, unknown>>({});
+  useEffect(() => {
+    if (!selectedId) return;
+    setIntakeAnswers({});
+    fetch(`/api/preview/intake?engagement_id=${encodeURIComponent(selectedId)}`, {
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json: { authenticated?: boolean; answers?: Record<string, unknown> } | null) => {
+        if (json?.authenticated && json.answers && Object.keys(json.answers).length > 0) {
+          setIntakeAnswers(json.answers);
+        }
+      })
+      .catch(() => {});
+  }, [selectedId]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const idCounter = useRef(1);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -290,6 +308,25 @@ export function KnowledgeChatPanel() {
         (i) =>
           `[extracted-insight · ${i.category} · ${i.confidence}] ${i.insight} (source: ${i.source_document})`,
       ),
+      // Raw intake answers fetched directly from the API — included here
+      // so the chatbot sees them even if the KB sync to Supabase failed.
+      // Only added when the KB doesn't already contain an intake step so
+      // we avoid duplicating data the KB formatter already emitted above.
+      ...(!kb.intake && Object.keys(intakeAnswers).length > 0
+        ? Object.entries(intakeAnswers)
+            .filter(([, v]) => v !== "" && v !== null && v !== undefined)
+            .flatMap(([k, v]) => {
+              const val = Array.isArray(v)
+                ? (v as string[]).filter(Boolean).join(", ")
+                : String(v);
+              if (!val) return [];
+              const label = k
+                .replace(/__note$/i, " note")
+                .replace(/__other$/i, " other")
+                .replace(/_/g, " ");
+              return [`[intake · ${label}] ${val}`];
+            })
+        : []),
     ].join("\n");
 
     let answerText = "";
