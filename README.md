@@ -1,6 +1,6 @@
-# Kaptrix Delivery Platform
+# KaptrixComply
 
-Internal AI product diligence platform for private equity, growth equity, family offices, and corporate development teams evaluating AI-heavy software investments.
+AI-powered compliance analysis platform for private equity, growth equity, family offices, and corporate development teams. Automates regulatory and framework compliance scoring, gap analysis, and audit-ready reporting for portfolio companies and acquisition targets.
 
 ## Quick Start
 
