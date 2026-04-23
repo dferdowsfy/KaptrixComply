@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getServiceClient } from "@/lib/supabase/service";
 import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,8 @@ const STAGE_CONFIG: Record<
 
 export default async function CategoryOverviewPage({ params }: Props) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = getServiceClient();
+  if (!supabase) notFound();
 
   const [
     { data: engagement },
