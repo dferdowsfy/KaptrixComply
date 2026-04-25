@@ -191,7 +191,7 @@ export function getSelfHostedLlmApiKey(): string {
  *   - report / positioning: quality-sensitive, longer outputs, JSON mode →
  *     use the stronger 7B default (qwen2.5:7b, ~4 tok/s).
  */
-export type LlmTask = "chat" | "guidance" | "report" | "positioning";
+export type LlmTask = "chat" | "guidance" | "report" | "positioning" | "extract";
 
 export function getSelfHostedLlmModelForTask(task: LlmTask): string {
   const envKey: Record<LlmTask, string> = {
@@ -199,6 +199,7 @@ export function getSelfHostedLlmModelForTask(task: LlmTask): string {
     guidance: "SELF_HOSTED_LLM_MODEL_GUIDANCE",
     report: "SELF_HOSTED_LLM_MODEL_REPORT",
     positioning: "SELF_HOSTED_LLM_MODEL_POSITIONING",
+    extract: "SELF_HOSTED_LLM_MODEL_EXTRACT",
   };
   const override = getServerEnv(envKey[task]);
   if (override && !isPlaceholder(override)) return override;
