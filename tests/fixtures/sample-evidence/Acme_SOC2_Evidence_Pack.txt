@@ -1,0 +1,166 @@
+ACME CORPORATION — SOC 2 TYPE II EVIDENCE PACK
+Prepared for: Kaptrix Vendor Assessment
+Date: March 2026
+Issuer: Acme Corporation Information Security Team
+
+==============================================================
+CC6.1 — LOGICAL ACCESS CONTROLS
+==============================================================
+
+Acme Corporation implements logical access controls to restrict access to all systems and data. Access to production systems is governed by Role-Based Access Control (RBAC) enforced through our Identity Provider (Okta). Every user account is provisioned with least-privilege permissions. Access control lists are reviewed quarterly by system owners and the Information Security team. Segregation of duties is enforced for all privileged operations.
+
+Evidence: Access control policy (v3.4, reviewed Jan 2026), Okta RBAC configuration export, quarterly access review sign-off records.
+
+==============================================================
+CC6.2 — MULTI-FACTOR AUTHENTICATION (MFA)
+==============================================================
+
+Multi-factor authentication (MFA) mechanisms are in place for all remote access and all privileged accounts. Acme enforces MFA via Duo Security integrated with Okta for all VPN connections, all SSH access to production infrastructure, and all administrative console logins. MFA is mandatory — users cannot bypass it. Accounts that fail MFA three times are automatically locked and require InfoSec intervention to unlock.
+
+Privileged accounts (root, admin, service accounts with elevated rights) additionally require hardware security keys (YubiKey FIDO2). MFA enrollment is audited monthly; any account missing MFA is auto-suspended within 24 hours.
+
+Evidence: Duo Security admin dashboard export, Okta MFA policy configuration, YubiKey enrollment log, monthly MFA compliance report (Feb 2026).
+
+==============================================================
+CC6.3 — USER PROVISIONING AND DEPROVISIONING
+==============================================================
+
+Acme maintains a formal process for provisioning and deprovisioning user access. New hire provisioning is triggered by an approved HR ticket in Workday. Access is provisioned by the IT team within 4 business hours and follows the access control matrix for the employee's role. Deprovisioning is triggered on the employee's last day — all accounts are disabled within 2 hours of termination and fully deleted within 30 days. Contractor access is provisioned with fixed expiry dates and revoked automatically.
+
+Evidence: IT provisioning SOP (v2.1), HR-IT integration workflow diagram, deprovisioning audit log (Q4 2025), access control matrix.
+
+==============================================================
+CC7.1 — SECURITY EVENT DETECTION AND RESPONSE
+==============================================================
+
+Acme's Security Operations Center (SOC) detects and responds to security events in a timely manner. Our SIEM (Splunk Enterprise Security) aggregates logs from all infrastructure, endpoints, and cloud services. Automated detection rules trigger alerts for anomalous behavior, unauthorized access attempts, and policy violations.
+
+Incident response SLAs:
+- P1 (Critical): Detection within 15 minutes, initial response within 30 minutes, executive notification within 1 hour.
+- P2 (High): Detection within 1 hour, response within 4 hours.
+- P3 (Medium): Response within 24 hours.
+- P4 (Low): Response within 5 business days.
+
+The Incident Response Plan (IRP v4.2) is tested twice annually via tabletop exercises. All incidents are logged in Jira Security and reviewed in weekly InfoSec meetings.
+
+Evidence: Splunk SIEM dashboard, Incident Response Plan (v4.2), tabletop exercise report (Nov 2025), incident log (Q1 2026).
+
+==============================================================
+CC7.2 — VULNERABILITY ASSESSMENTS AND PENETRATION TESTS
+==============================================================
+
+Vulnerability assessments and penetration tests are performed regularly by Acme. External penetration tests are conducted annually by NCC Group (independent third-party). The most recent penetration test was completed in October 2025. NCC Group found 2 medium-severity findings and 0 critical or high findings. All medium findings were remediated within 30 days as verified by NCC Group in a re-test.
+
+Internal vulnerability assessments are performed monthly using Tenable Nessus. Critical and high vulnerabilities are remediated within 7 and 30 days respectively. Patch compliance is tracked and reported to the CISO monthly.
+
+Evidence: NCC Group Penetration Test Report (Oct 2025), remediation sign-off letter, Tenable vulnerability scan dashboard, patch management policy.
+
+==============================================================
+CC8.1 — CHANGE MANAGEMENT
+==============================================================
+
+Acme maintains a formal change management process that includes authorization and testing for all changes. All code changes require a pull request (PR) in GitHub, peer review by at least one other engineer, and automated test suite passing (>90% coverage). Production deployments require approval from the Change Advisory Board (CAB) for major changes.
+
+Emergency changes follow an expedited CAB process with post-deployment review within 48 hours. All changes are logged in the change management system (ServiceNow). Rollback procedures are defined and tested for all production services.
+
+Evidence: GitHub PR audit log, CAB meeting minutes (Q1 2026), ServiceNow change log, change management policy (v2.0).
+
+==============================================================
+A1.1 — AVAILABILITY COMMITMENTS AND SERVICE LEVELS
+==============================================================
+
+Acme has documented availability commitments and service levels. Our SLA commits to 99.9% monthly uptime for all production services. Planned maintenance windows are communicated 72 hours in advance and scheduled outside business hours. Uptime is tracked in real-time via our status page (status.acme.com) and reported monthly to customers.
+
+Evidence: SLA documentation, uptime report (12-month trailing, 99.97% achieved), status page export.
+
+==============================================================
+A1.2 — BUSINESS CONTINUITY AND DISASTER RECOVERY
+==============================================================
+
+Business continuity and disaster recovery plans are in place and tested annually. Acme's BCP (v3.1) and DR plan (v2.4) define recovery objectives and procedures for all critical systems.
+
+Recovery objectives:
+- RTO (Recovery Time Objective): 4 hours for critical systems, 24 hours for non-critical.
+- RPO (Recovery Point Objective): 1 hour for databases, 4 hours for file storage.
+
+Infrastructure is deployed across two AWS regions (us-east-1 primary, us-west-2 failover) with automated failover. DR tests are conducted semi-annually; the most recent test (September 2025) achieved RTO of 3h 12m and RPO of 47 minutes, both within targets.
+
+Evidence: BCP document (v3.1), DR plan (v2.4), DR test report (Sep 2025), AWS multi-region architecture diagram.
+
+==============================================================
+A1.3 — CAPACITY MONITORING
+==============================================================
+
+System capacity is monitored and managed to meet availability commitments. Acme uses AWS CloudWatch and Datadog for real-time capacity monitoring across all services. Auto-scaling policies are in place for all stateless services. Capacity planning reviews are conducted quarterly; the infrastructure team maintains a 30% headroom buffer above peak observed load.
+
+Evidence: Datadog monitoring dashboard, AWS CloudWatch alarms configuration, quarterly capacity review report (Q4 2025).
+
+==============================================================
+C1.1 — DATA CLASSIFICATION
+==============================================================
+
+Confidential data assets are identified and classified at Acme. Our data classification policy defines four tiers: Public, Internal, Confidential, and Restricted. All data repositories are tagged according to classification tier. A data inventory (maintained in Collibra) catalogs all data assets, their classification, ownership, and retention periods.
+
+Evidence: Data classification policy (v1.8), Collibra data inventory export, classification tagging audit report.
+
+==============================================================
+C1.2 — ENCRYPTION IN TRANSIT AND AT REST
+==============================================================
+
+Confidential information is encrypted in transit and at rest throughout Acme's infrastructure. All data in transit is protected using TLS 1.3 (minimum TLS 1.2 enforced by policy; TLS 1.0 and 1.1 are disabled). All data at rest is encrypted using AES-256. Database encryption uses AWS RDS encryption with AWS KMS-managed keys. S3 buckets enforce server-side encryption (SSE-S3 or SSE-KMS). Key rotation is performed annually; KMS key policies restrict access to authorized services only.
+
+Evidence: Encryption policy (v2.2), AWS KMS key configuration export, TLS configuration scan results, RDS encryption settings.
+
+==============================================================
+P3.1 — PRIVACY NOTICE
+==============================================================
+
+Acme maintains a privacy notice that discloses how personal data is collected and used. Our Privacy Policy (publicly available at acme.com/privacy) describes all categories of personal data collected, purposes of processing, legal bases, retention periods, and data subject rights. The privacy notice is reviewed and updated annually by our Data Protection Officer (DPO).
+
+Evidence: Privacy Policy (v2.3, effective Jan 2026), DPO review sign-off, website privacy notice screenshot.
+
+==============================================================
+P4.1 — DATA SUBJECT RIGHTS
+==============================================================
+
+Acme honors data subject rights including access, deletion, and portability. Individuals can submit Data Subject Access Requests (DSARs) via a dedicated portal (privacy.acme.com). DSARs are fulfilled within 30 days (14 days for EU residents per GDPR). Deletion requests result in permanent erasure within 30 days. Portability requests are fulfilled in machine-readable format (JSON or CSV).
+
+Evidence: DSAR process documentation, privacy portal screenshot, DSAR log (anonymized, Q4 2025 — 12 requests, 100% fulfilled on time).
+
+==============================================================
+P6.1 — THIRD-PARTY DATA PROCESSOR ASSESSMENT
+==============================================================
+
+Third-party data processors are assessed for privacy compliance before onboarding and annually thereafter. Acme maintains a sub-processor list (publicly available). All data processors sign a Data Processing Agreement (DPA) prior to processing personal data. Processors are assessed against our vendor security questionnaire; those handling sensitive data undergo additional security review.
+
+Evidence: Sub-processor list (updated Feb 2026), DPA template, vendor assessment questionnaire, processor review tracker.
+
+==============================================================
+CC1.1 — BOARD-LEVEL SECURITY COMMITMENT
+==============================================================
+
+Acme has board-level and executive-level commitment to information security. The CISO reports directly to the CEO and presents quarterly security updates to the Board of Directors. The Information Security Steering Committee (ISSC) meets monthly and includes the CEO, CFO, CTO, and CISO. The Board has approved the Information Security Policy and annual security budget.
+
+Evidence: Board resolution on information security (Jan 2026), ISSC meeting minutes (Q1 2026), org chart showing CISO reporting line.
+
+==============================================================
+CC2.1 — INFORMATION SECURITY POLICIES
+==============================================================
+
+Acme has documented information security policies reviewed annually. The Information Security Policy (ISP v5.0) was last reviewed and approved by the Board in January 2026. The ISP covers acceptable use, access control, cryptography, incident response, business continuity, and third-party management. All employees complete annual security awareness training and attest to the policy.
+
+Evidence: Information Security Policy (v5.0), Board approval sign-off (Jan 2026), employee attestation completion report (98.7% completion rate, Feb 2026).
+
+==============================================================
+CC3.1 — RISK ASSESSMENT
+==============================================================
+
+A formal risk assessment process is conducted at least annually at Acme. The enterprise risk register is maintained by the Risk Management team and updated quarterly. The annual risk assessment follows the NIST SP 800-30 methodology. Risks are scored by likelihood and impact; risks above the accepted threshold require a risk treatment plan approved by the CISO.
+
+Evidence: Risk assessment report (Dec 2025), risk register (Q1 2026 update), NIST methodology documentation, risk treatment plans for all high/critical risks.
+
+==============================================================
+END OF EVIDENCE PACK
+==============================================================
+
+This evidence pack was prepared by Acme Corporation's Information Security and Compliance team for the Kaptrix SOC 2 vendor assessment. All evidence is current as of March 2026. For questions, contact compliance@acme.com.

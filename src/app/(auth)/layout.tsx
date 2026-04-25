@@ -19,7 +19,7 @@ export default function AuthLayout({
       />
 
       <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
-        <Link href="/" aria-label="KAPTRIX home" className="group">
+        <Link href="/" aria-label="Kaptrix home" className="group">
           <Logo
             wordClassName="text-lg sm:text-xl text-white"
             markClassName="h-7 w-7"

@@ -1,4 +1,4 @@
-# KaptrixComply
+# Kaptrix
 
 AI-powered compliance analysis platform for private equity, growth equity, family offices, and corporate development teams. Automates regulatory and framework compliance scoring, gap analysis, and audit-ready reporting for portfolio companies and acquisition targets.
 

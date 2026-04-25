@@ -16,7 +16,7 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://kaptrix.com";
 
 export const metadata: Metadata = {
   title: {
-    default: "Kaptrix | AI Product Diligence for Private Equity",
+    default: "Kaptrix | Evidence-backed vendor compliance, automated",
     template: "%s | Kaptrix",
   },
   description:
@@ -33,14 +33,14 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     siteName: "Kaptrix",
-    title: "Kaptrix | AI Product Diligence for Private Equity",
+    title: "Kaptrix | Evidence-backed vendor compliance, automated",
     description:
       "Evidence-backed AI diligence for investors and operators. Expose fragile systems, score what's real, and produce decision-grade outputs before capital moves.",
     url: baseUrl,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Kaptrix | AI Product Diligence for Private Equity",
+    title: "Kaptrix | Evidence-backed vendor compliance, automated",
     description:
       "Evidence-backed AI diligence for investors and operators. Expose fragile systems, score what's real, and produce decision-grade outputs before capital moves.",
   },

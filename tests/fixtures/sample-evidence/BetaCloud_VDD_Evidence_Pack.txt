@@ -1,0 +1,175 @@
+BETACLOUD INC — VENDOR DUE DILIGENCE EVIDENCE PACK
+Prepared for: Kaptrix VDD Assessment
+Date: March 2026
+Issuer: BetaCloud Inc Legal, Finance & Security Teams
+
+==============================================================
+VDD-FIN-01 — AUDITED FINANCIAL STATEMENTS
+==============================================================
+
+The most recent 3 years of audited financial statements are available for BetaCloud Inc. Annual audits are conducted by Deloitte LLP (PCAOB-registered). Audited financial statements for fiscal years 2023, 2024, and 2025 are available upon execution of an NDA.
+
+Summary financials:
+- FY2025: Revenue $28.4M (+34% YoY), Net Loss ($4.1M), Cash & Equivalents $18.2M
+- FY2024: Revenue $21.2M (+41% YoY), Net Loss ($5.3M), Cash & Equivalents $14.7M
+- FY2023: Revenue $15.0M (+28% YoY), Net Loss ($4.8M), Cash & Equivalents $9.1M
+
+BetaCloud raised Series B ($30M) in Q3 2025. Current cash runway is approximately 30 months at current burn rate of $600K per month. No qualified audit opinions have been issued.
+
+Evidence: Audited financial statements FY2023–2025 (Deloitte), Series B term sheet, cap table summary.
+
+==============================================================
+VDD-FIN-02 — DEBT-TO-EQUITY RATIO AND CREDIT RATING
+==============================================================
+
+BetaCloud's current debt-to-equity ratio is 0.18 as of December 2025 (total liabilities $3.2M, total equity $17.8M). The company has no long-term debt; the only liabilities are operating leases and accounts payable. BetaCloud does not carry a formal credit rating (private company). A credit reference is available from Silicon Valley Bank (primary banking partner).
+
+Evidence: Balance sheet (Dec 2025, from audited financials), SVB credit reference letter.
+
+==============================================================
+VDD-FIN-03 — WORKING CAPITAL AND LIQUIDITY
+==============================================================
+
+BetaCloud has adequate working capital and liquidity to meet obligations. Current assets total $21.4M against current liabilities of $2.1M, yielding a current ratio of 10.2x. Cash and short-term investments of $18.2M cover more than 30 months of operating expenses at the current burn rate. BetaCloud maintains a $5M revolving credit facility with SVB (undrawn as of March 2026) for additional liquidity.
+
+Evidence: Working capital schedule (Dec 2025), revolving credit agreement (SVB), cash flow statement (FY2025).
+
+==============================================================
+VDD-FIN-04 — LITIGATION, REGULATORY PENALTIES, AND CONTINGENCIES
+==============================================================
+
+There are no outstanding litigation matters, regulatory penalties, or material contingencies as of March 2026. BetaCloud has not been subject to any regulatory enforcement actions or material lawsuits. One minor employment dispute was settled out of court in Q2 2024 for $42K (immaterial). No contingent liabilities are disclosed in the FY2025 audited financial statements.
+
+Evidence: Legal disclosure schedule (FY2025 audit), litigation register (updated March 2026, showing no open matters), outside counsel confirmation letter.
+
+==============================================================
+VDD-FIN-05 — OWNERSHIP CHANGES AND M&A
+==============================================================
+
+BetaCloud has not undergone any significant ownership changes or M&A transactions in the past 2 years. The most recent capital raise was the Series B ($30M, Q3 2025) from existing investors Accel Partners and new investor Sequoia Capital. The founding team retains majority voting control. No acquisitions, divestitures, or change-of-control events have occurred.
+
+Evidence: Cap table (March 2026), shareholder agreement, Series B closing documents, corporate structure chart.
+
+==============================================================
+VDD-OPS-01 — BUSINESS CONTINUITY AND DISASTER RECOVERY
+==============================================================
+
+BetaCloud has documented business continuity and disaster recovery plans. The Business Continuity Plan (BCP v2.3) and Disaster Recovery Plan (DRP v1.8) are reviewed and updated annually. Critical systems are defined, and recovery procedures are documented for each.
+
+Recovery objectives:
+- RTO (Recovery Time Objective): 4 hours for the core SaaS platform, 8 hours for supporting services.
+- RPO (Recovery Point Objective): 1 hour for customer databases, 4 hours for file storage.
+
+Infrastructure is deployed across two AWS regions (us-east-1 primary, us-west-2 failover) with automated failover via AWS Route 53 health checks. Annual DR tests validate that RTO and RPO targets are achievable. The most recent DR test (January 2026) achieved RTO of 3h 45m and RPO of 52 minutes.
+
+Evidence: BCP (v2.3), DRP (v1.8), DR test report (Jan 2026), AWS architecture diagram.
+
+==============================================================
+VDD-OPS-02 — SERVICE UPTIME TRACK RECORD
+==============================================================
+
+BetaCloud's service uptime track record over the past 12 months (March 2025 – February 2026) demonstrates 99.97% uptime, exceeding the contractual SLA of 99.9%. There were two incidents: a 43-minute degradation in May 2025 (AWS us-east-1 networking issue) and a 29-minute outage in September 2025 (database failover test that ran long). Both incidents were communicated proactively via the status page and post-incident reports were published within 48 hours.
+
+Uptime SLA: 99.9% monthly uptime guaranteed. Penalties apply for breaches below 99.5%.
+
+Evidence: 12-month uptime report (March 2025 – Feb 2026), status page history export, incident post-mortems (May 2025, Sep 2025), SLA document.
+
+==============================================================
+VDD-OPS-03 — SINGLE POINTS OF FAILURE
+==============================================================
+
+BetaCloud has identified and mitigated single points of failure in critical systems and supply chain. All production services are deployed with redundancy: no single availability zone, single instance, or single provider constitutes a critical dependency. Third-party dependencies are documented in a vendor risk register; critical SaaS dependencies (Stripe for payments, Twilio for communications) have redundant fallback providers.
+
+A risk assessment of the supply chain was conducted in Q4 2025; two previously identified single points of failure (legacy database cluster, single CDN provider) were remediated and closed.
+
+Evidence: Architecture diagram (multi-region, no SPOF), vendor risk register (Q4 2025), risk assessment report (Dec 2025), remediation evidence for closed SPOF items.
+
+==============================================================
+VDD-OPS-04 — KEY-PERSON DEPENDENCIES AND SUCCESSION PLANNING
+==============================================================
+
+BetaCloud has assessed key-person dependencies and maintains succession planning documentation. The CEO, CTO, and VP Engineering are identified as key persons. Cross-training programs ensure that each critical role has at least two internal successors identified and partially trained. Directors' and Officers' (D&O) insurance is in place. The company has documented succession plans approved by the Board.
+
+Evidence: Succession plan (Board-approved, Nov 2025), org chart, D&O insurance certificate, key-person dependency assessment.
+
+==============================================================
+VDD-DATA-01 — CERTIFICATIONS (ISO 27001, SOC 2, PCI DSS)
+==============================================================
+
+BetaCloud holds the following certifications:
+
+- SOC 2 Type II: Issued by Deloitte (November 2025). Covers Security, Availability, and Confidentiality trust service criteria. Audit period: October 2024 – October 2025. Zero exceptions noted.
+- ISO 27001: Certified by BSI Group (April 2025). Certificate number: IS 847392. Scope covers the entire production environment. Surveillance audit scheduled April 2026.
+- PCI DSS Level 1: Assessed by a QSA (Coalfire, March 2025). Cardholder data environment is fully compliant.
+
+Evidence: SOC 2 Type II report (Deloitte, Nov 2025), ISO 27001 certificate (BSI, Apr 2025), PCI DSS AOC (Coalfire, Mar 2025).
+
+==============================================================
+VDD-DATA-02 — CUSTOMER DATA SEGREGATION
+==============================================================
+
+Customer data is segregated from other customers' data at the database level. BetaCloud uses a multi-tenant architecture with logical data segregation: each customer's data is stored in separate database schemas with row-level security policies enforced at the database layer. Tenant isolation is enforced in application code and verified in quarterly security reviews. No shared tables contain cross-tenant data.
+
+Evidence: Architecture documentation (data segregation section), database schema design, quarterly security review report (Q4 2025).
+
+==============================================================
+VDD-DATA-03 — DATA RETENTION AND DELETION POLICY
+==============================================================
+
+BetaCloud's data retention and deletion policy defines retention periods for all data categories. Customer data is retained for the duration of the contract plus 90 days after termination, then permanently deleted. Operational logs are retained for 12 months. Backup data is retained for 30 days. Deletion is cryptographic erasure (key destruction for encrypted volumes) or secure overwrite. Deletion certificates are provided upon request.
+
+Evidence: Data retention policy (v1.5, Jan 2026), deletion SOP, sample deletion certificate.
+
+==============================================================
+VDD-DATA-04 — DATA RESIDENCY
+==============================================================
+
+BetaCloud stores data in AWS data centers located in the United States (us-east-1, Northern Virginia; us-west-2, Oregon). EU customers can request EU-based data residency (AWS eu-west-1, Ireland) at no additional cost. BetaCloud complies with GDPR data residency requirements for EU customers via Standard Contractual Clauses (SCCs) and an EU-US Data Privacy Framework (DPF) certification.
+
+Evidence: Data residency policy, AWS region configuration, DPF certification (updated Jan 2026), SCC addendum template.
+
+==============================================================
+VDD-DATA-05 — DATA PROCESSING AGREEMENT (DPA)
+==============================================================
+
+BetaCloud offers a Data Processing Agreement (DPA) and data processing addendum to all enterprise customers. The DPA is compliant with GDPR Article 28 requirements and covers sub-processors, data subject rights, breach notification (within 72 hours), and audit rights. The DPA is available as a standard exhibit to the Master Subscription Agreement (MSA) and can be executed digitally.
+
+Evidence: Standard DPA template (v2.1, legal counsel reviewed Jan 2026), sub-processor list (updated March 2026), MSA with DPA exhibit.
+
+==============================================================
+VDD-LEGAL-01 — SLAs, PENALTY CLAUSES, AND EXIT RIGHTS
+==============================================================
+
+SLAs, penalty clauses, and exit rights are clearly defined in BetaCloud's standard contract. Service credits apply when uptime falls below SLA thresholds: 10% monthly fee credit for <99.9% uptime, 25% for <99.5%, and 50% for <99.0%. Customers have the right to terminate for cause with 30 days' notice if SLA credits exceed 3 consecutive months. Data portability and export rights are guaranteed within 30 days of termination. All terms are in plain language with no auto-renewal beyond 12-month initial term.
+
+Evidence: Master Subscription Agreement (MSA v4.0), SLA schedule, sample contract (redacted), exit rights documentation.
+
+==============================================================
+VDD-LEGAL-02 — THIRD-PARTY AUDITS AND CUSTOMER ASSESSMENTS
+==============================================================
+
+BetaCloud allows third-party audits and assessments by customers subject to a reasonable notice period (30 days) and NDA. Customers may review the SOC 2 Type II report at any time, request penetration test executive summaries, and conduct remote questionnaire-based assessments annually. On-site audits are permitted for Enterprise customers with 60 days' notice.
+
+Evidence: Audit rights clause in MSA (Section 12.4), SOC 2 report sharing process, audit facilitation SOP.
+
+==============================================================
+VDD-SEC-01 — PENETRATION TEST
+==============================================================
+
+BetaCloud has conducted a penetration test within the past 12 months. The most recent penetration test was performed by NCC Group in November 2025 (external black-box test of the production SaaS platform). Findings: 1 high, 3 medium, 5 low. The high finding (SSRF vulnerability) was remediated within 14 days and verified by NCC Group. All medium findings were remediated within 30 days. The annual penetration test schedule is maintained; the next test is planned for November 2026.
+
+Evidence: NCC Group Penetration Test Report (Nov 2025, executive summary), remediation verification letter, annual pentest schedule.
+
+==============================================================
+VDD-SEC-02 — VULNERABILITY DISCLOSURE PROGRAM
+==============================================================
+
+BetaCloud has a vulnerability disclosure and responsible disclosure program in place. The program is published at betacloud.io/security. External security researchers can report vulnerabilities via a dedicated HackerOne bug bounty program (launched January 2024). Submissions are triaged within 5 business days; critical findings are escalated immediately. BetaCloud commits to a coordinated disclosure timeline of 90 days.
+
+Evidence: Responsible disclosure policy (betacloud.io/security), HackerOne program dashboard, triage SLA documentation.
+
+==============================================================
+END OF VENDOR DUE DILIGENCE EVIDENCE PACK
+==============================================================
+
+This VDD evidence pack was prepared by BetaCloud Inc's Legal, Finance, and Security teams for the Kaptrix vendor due diligence assessment. All information is current as of March 2026. For questions, contact security@betacloud.io.

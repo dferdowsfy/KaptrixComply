@@ -38,6 +38,21 @@ export default function SettingsPage() {
         setFullName(profile.full_name ?? "");
         setFirmName(profile.firm_name ?? "");
       }
+      // Resolve Kaptrix workspace based on user_roles
+      if (data.user?.id) {
+        const { data: roleRow } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user.id)
+          .maybeSingle();
+        const role = (roleRow?.role as string | undefined)
+          ?? (data.user.user_metadata?.role as string | undefined);
+        if (role === "vendor") {
+          setWorkspaceHref("/vendor/dashboard");
+        } else if (role === "compliance_officer") {
+          setWorkspaceHref("/officer/dashboard");
+        }
+      }
       setLoading(false);
     });
   }, []);

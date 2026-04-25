@@ -336,8 +336,8 @@ function LoginForm() {
             required
           />
           <span>
-            I agree that Kaptrix may process uploaded diligence materials to
-            generate scores, reports, and an evidence index for my clients. No
+            I agree that Kaptrix may process uploaded compliance materials to
+            generate scores, reports, and an evidence index for my organization. No
             data is shared across firms.
           </span>
         </label>

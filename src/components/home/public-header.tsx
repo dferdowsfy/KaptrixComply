@@ -86,7 +86,7 @@ export function PublicHeader() {
         style={menuOpen ? { backgroundColor: `${MENU_PURPLE}F2` } : undefined}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-6 py-5">
-          <Link href="/" aria-label="KAPTRIX home" className="group">
+          <Link href="/" aria-label="Kaptrix home" className="group">
             <span
               className={`text-sm font-semibold uppercase tracking-[0.32em] transition-colors sm:text-base ${
                 scrolledGlass ? "text-slate-900" : "text-white"

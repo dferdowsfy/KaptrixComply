@@ -15,7 +15,7 @@ export function Logo({ className, markClassName, wordClassName }: LogoProps) {
           wordClassName ?? "text-base"
         }`}
       >
-        KAPTRIX
+        Kaptrix
       </span>
     </span>
   );
