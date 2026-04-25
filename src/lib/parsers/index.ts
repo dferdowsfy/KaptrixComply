@@ -11,6 +11,7 @@ export async function parsePdf(buffer: Buffer): Promise<string> {
   // defined". Importing /lib/pdf-parse.js bypasses the package's debug-only
   // index that tries to read a test PDF at module init.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // @ts-expect-error pdf-parse/lib/pdf-parse.js has no type declarations
   const mod: any = await import("pdf-parse/lib/pdf-parse.js");
   const pdfParse = mod.default ?? mod;
   const result = await pdfParse(buffer);
