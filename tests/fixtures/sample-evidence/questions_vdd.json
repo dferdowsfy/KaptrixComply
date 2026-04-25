@@ -1,0 +1,66 @@
+[
+  {
+    "question_text": "Provide your most recent audited financial statements and describe key financial metrics.",
+    "control_category": "Financial",
+    "control_id": "FIN-01",
+    "expected_evidence_types": ["financial_statement", "audit_report"],
+    "weight": 1.5,
+    "is_required": true
+  },
+  {
+    "question_text": "What is your current cash runway and burn rate?",
+    "control_category": "Financial Risk",
+    "control_id": "FIN-02",
+    "expected_evidence_types": ["financial_statement"],
+    "weight": 1.25,
+    "is_required": true
+  },
+  {
+    "question_text": "Disclose any material litigation, regulatory actions, or financial restatements in the last 3 years.",
+    "control_category": "Governance",
+    "control_id": "GOV-01",
+    "expected_evidence_types": ["contract", "audit_report"],
+    "weight": 1.1,
+    "is_required": true
+  },
+  {
+    "question_text": "What is your documented uptime SLA and how is it measured?",
+    "control_category": "Availability",
+    "control_id": "OPS-01",
+    "expected_evidence_types": ["contract", "audit_report"],
+    "weight": 1.0,
+    "is_required": true
+  },
+  {
+    "question_text": "Describe your disaster recovery and business continuity capabilities including RTO and RPO.",
+    "control_category": "Operational Resilience",
+    "control_id": "OPS-02",
+    "expected_evidence_types": ["business_continuity_plan", "audit_report"],
+    "weight": 1.1,
+    "is_required": true
+  },
+  {
+    "question_text": "How is customer data encrypted in transit and at rest?",
+    "control_category": "Data Privacy",
+    "control_id": "DATA-01",
+    "expected_evidence_types": ["policy_document", "audit_report"],
+    "weight": 1.25,
+    "is_required": true
+  },
+  {
+    "question_text": "Do you maintain a sub-processor list? How do you manage sub-processor risk?",
+    "control_category": "Data Privacy",
+    "control_id": "DATA-02",
+    "expected_evidence_types": ["policy_document", "contract"],
+    "weight": 1.0,
+    "is_required": true
+  },
+  {
+    "question_text": "What compliance certifications does your organization currently hold?",
+    "control_category": "Governance",
+    "control_id": "GOV-02",
+    "expected_evidence_types": ["certificate", "soc2_report", "iso_certificate"],
+    "weight": 1.1,
+    "is_required": true
+  }
+]

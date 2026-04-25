@@ -3,6 +3,7 @@ import { SECURITY_HEADERS } from "./src/lib/security/headers";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  serverExternalPackages: ['pdf-parse', 'pdfjs-dist', 'mammoth', 'xlsx', 'jszip'],
   async headers() {
     return [
       {

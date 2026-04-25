@@ -24,13 +24,17 @@ function LoginSkeleton() {
   );
 }
 
+type SignupRole = "compliance_officer" | "vendor";
+
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [firmName, setFirmName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<SignupRole>("compliance_officer");
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -51,14 +55,20 @@ function LoginForm() {
 
     if (!supabaseConfigured) {
       setMessage(
-        "Supabase is not configured yet. Use /preview to see the Kaptrix UI locally.",
+        "Supabase is not configured yet. Use /preview to see the KaptrixComply UI locally.",
       );
       return;
     }
 
-    if (isSignUp && !agree) {
-      setMessage("Please accept the terms to continue.");
-      return;
+    if (isSignUp) {
+      if (password !== confirmPassword) {
+        setMessage("Passwords do not match.");
+        return;
+      }
+      if (!agree) {
+        setMessage("Please accept the terms to continue.");
+        return;
+      }
     }
 
     setLoading(true);
@@ -67,7 +77,7 @@ function LoginForm() {
     const supabase = createClient();
 
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -77,26 +87,52 @@ function LoginForm() {
             firm_name: firmName.trim(),
             job_title: jobTitle.trim(),
             phone: phone.trim(),
+            role,
           },
         },
       });
 
       if (error) {
         setMessage(error.message);
-      } else {
+      } else if (data.user) {
+        // Persist the role + org info to user_roles via the service-role API.
+        // user_roles RLS denies direct user inserts.
+        try {
+          await fetch("/api/auth/complete-signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: data.user.id,
+              email,
+              role,
+              org_name: firmName.trim(),
+              full_name: fullName.trim(),
+              job_title: jobTitle.trim(),
+              phone: phone.trim(),
+            }),
+          });
+        } catch {
+          // Non-fatal: callback handler will retry from user_metadata.
+        }
         setConfirmationEmail(email);
         setConfirmationSent(true);
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
         setMessage(error.message);
-      } else {
-        router.push("/app");
+      } else if (data.user) {
+        const { data: roleRow } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user.id)
+          .maybeSingle();
+        const dest = roleRow?.role === "vendor" ? "/vendor/dashboard" : "/officer/dashboard";
+        router.push(dest);
         return;
       }
     }
@@ -167,10 +203,10 @@ function LoginForm() {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="text-center">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-indigo-200/80">
-          {isSignUp ? "Join Kaptrix" : "Welcome back"}
+          {isSignUp ? "Join KaptrixComply" : "Welcome back"}
         </p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-          {isSignUp ? "Create your account" : "Log in to Kaptrix"}
+          {isSignUp ? "Create your account" : "Log in to KaptrixComply"}
         </h2>
         <p className="mt-2 text-sm text-white/60">
           {isSignUp
@@ -228,6 +264,55 @@ function LoginForm() {
       {isSignUp && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
+            <span className="block text-sm font-medium text-white/80 mb-1.5">
+              I am a&hellip;
+            </span>
+            <div
+              role="radiogroup"
+              aria-label="Account type"
+              className="grid grid-cols-2 gap-2"
+            >
+              {(
+                [
+                  {
+                    value: "compliance_officer" as const,
+                    label: "Compliance Officer",
+                    desc: "Review vendors & generate reports",
+                  },
+                  {
+                    value: "vendor" as const,
+                    label: "Vendor",
+                    desc: "Respond to questionnaires",
+                  },
+                ]
+              ).map((opt) => {
+                const selected = role === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setRole(opt.value)}
+                    className={`text-left rounded-lg border px-3 py-2.5 transition ${
+                      selected
+                        ? "border-indigo-300/70 bg-indigo-500/15 ring-1 ring-indigo-300/50"
+                        : "border-white/15 bg-white/5 hover:border-white/30"
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold text-white">
+                      {opt.label}
+                    </span>
+                    <span className="block text-[11px] text-white/55 mt-0.5">
+                      {opt.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="sm:col-span-2">
             <label htmlFor="fullName" className="block text-sm font-medium text-white/80">
               Full name
             </label>
@@ -244,7 +329,7 @@ function LoginForm() {
           </div>
           <div>
             <label htmlFor="firmName" className="block text-sm font-medium text-white/80">
-              Firm / company
+              {role === "vendor" ? "Vendor company" : "Firm / company"}
             </label>
             <input
               id="firmName"
@@ -254,7 +339,7 @@ function LoginForm() {
               value={firmName}
               onChange={(e) => setFirmName(e.target.value)}
               className={inputClass}
-              placeholder="Meridian Capital"
+              placeholder={role === "vendor" ? "Acme Corp" : "Meridian Capital"}
             />
           </div>
           <div>
@@ -264,11 +349,12 @@ function LoginForm() {
             <input
               id="jobTitle"
               type="text"
+              required
               autoComplete="organization-title"
               value={jobTitle}
               onChange={(e) => setJobTitle(e.target.value)}
               className={inputClass}
-              placeholder="Principal"
+              placeholder={role === "vendor" ? "Security Analyst" : "Principal"}
             />
           </div>
           <div className="sm:col-span-2">
@@ -327,6 +413,28 @@ function LoginForm() {
       </div>
 
       {isSignUp && (
+        <div>
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-white/80">
+            Confirm password
+          </label>
+          <input
+            id="confirmPassword"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className={inputClass}
+            placeholder="Re-enter your password"
+          />
+          {confirmPassword.length > 0 && confirmPassword !== password && (
+            <p className="mt-1 text-xs text-rose-300">Passwords do not match.</p>
+          )}
+        </div>
+      )}
+
+      {isSignUp && (
         <label className="flex items-start gap-2 text-xs text-white/70">
           <input
             type="checkbox"
@@ -336,8 +444,8 @@ function LoginForm() {
             required
           />
           <span>
-            I agree that Kaptrix may process uploaded diligence materials to
-            generate scores, reports, and an evidence index for my clients. No
+            I agree that KaptrixComply may process uploaded compliance materials to
+            generate scores, reports, and an evidence index for my organization. No
             data is shared across firms.
           </span>
         </label>

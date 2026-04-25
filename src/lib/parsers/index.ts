@@ -6,10 +6,29 @@ import { visionExtract } from "@/lib/llm/vision";
 
 export async function parsePdf(buffer: Buffer): Promise<string> {
   const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: buffer });
+  const { join } = await import("node:path");
+
+  // Build the worker path at runtime so webpack never tries to statically
+  // resolve a sub-path that isn't in pdf-parse's exports field.
+  const workerPath = join(
+    process.cwd(),
+    "node_modules/pdf-parse/dist/pdf-parse/cjs/pdf.worker.mjs",
+  );
+  PDFParse.setWorker(`file://${workerPath}`);
+
+  const parser = new PDFParse({ data: buffer, verbosity: 0 });
 
   try {
     const result = await parser.getText();
+    // `pdf-parse` already concatenates page text. Keep form-feed page
+    // boundaries when page-level output is available so downstream chunking can
+    // preserve page numbers for evidence citations.
+    if (result.pages && result.pages.length > 0) {
+      return result.pages
+        .map((page) => page.text?.replace(/\s+/g, " ").trim() ?? "")
+        .filter(Boolean)
+        .join("\f");
+    }
     return result.text;
   } finally {
     await parser.destroy();

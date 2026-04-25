@@ -40,18 +40,76 @@ export function getClientIndustry(clientId: string): Industry | null {
   return map[clientId] ?? null;
 }
 
+// All valid intake question IDs. The LLM emits snake_case field keys that
+// must match one of these exactly to be written into the intake store.
+const VALID_INTAKE_IDS = new Set([
+  "engagement_type",
+  "buyer_archetype",
+  "buyer_industry",
+  "target_size_usd",
+  "decision_horizon_days",
+  "deal_thesis",
+  "deal_stage",
+  "diligence_priorities",
+  "internal_sponsor_role",
+  "dissenting_voices",
+  "approval_path",
+  "investment_size_usd",
+  "annual_run_rate_usd",
+  "cost_sensitivity",
+  "payback_expectation_months",
+  "gross_margin_hurdle",
+  "ai_ue_high_cost_workflows",
+  "ai_ue_cost_per_output_tracking",
+  "ai_ue_margin_behavior_at_scale",
+  "ai_ue_lower_cost_substitution",
+  "ai_ue_token_controls",
+  "primary_kpi",
+  "measurable_targets",
+  "kill_criteria",
+  "alternatives_considered",
+  "alternatives_detail",
+  "switching_cost_from_incumbent",
+  "lock_in_tolerance",
+  "in_house_ml_talent",
+  "data_readiness",
+  "change_management_risk",
+  "existing_ai_systems",
+  "ai_maturity_perception",
+  "primary_architecture",
+  "known_vendors",
+  "regulatory_exposure",
+  "customer_geographies",
+  "training_data_sources",
+  "customer_data_usage_rights",
+  "ip_indemnification_needed",
+  "business_continuity_requirement",
+  "data_exit_plan",
+  "multi_region_requirement",
+  "red_flag_priors",
+  "client_risk_appetite",
+  "artifacts_received",
+  "gaps_already_known",
+  "diligence_team_composition",
+  "context_notes",
+]);
+
+// Array fields that accumulate multiple values rather than being overwritten.
+const ARRAY_INTAKE_IDS = new Set([
+  "diligence_priorities",
+  "regulatory_exposure",
+  "red_flag_priors",
+  "known_vendors",
+  "alternatives_considered",
+  "training_data_sources",
+  "customer_geographies",
+]);
+
 export function mapInsightToIntakeField(insight: KnowledgeInsight): string | null {
   if (!insight.suggested_intake_field) return null;
-
-  const idByField: Record<string, string> = {
-    "Red flag priors": "red_flag_priors",
-    "Primary AI architecture": "primary_architecture",
-    "Regulatory exposure": "regulatory_exposure",
-    "Known vendor or model dependencies": "known_vendors",
-    "Diligence priorities": "diligence_priorities",
-  };
-
-  return idByField[insight.suggested_intake_field] ?? null;
+  return VALID_INTAKE_IDS.has(insight.suggested_intake_field)
+    ? insight.suggested_intake_field
+    : null;
 }
 
 export function mergeInsightIntoAnswers(
@@ -64,7 +122,7 @@ export function mergeInsightIntoAnswers(
   const next = { ...prev };
   const existing = next[targetId];
 
-  if (["red_flag_priors", "regulatory_exposure", "diligence_priorities"].includes(targetId)) {
+  if (ARRAY_INTAKE_IDS.has(targetId)) {
     const values = Array.isArray(existing) ? existing : [];
     if (!values.includes(insight.suggested_intake_value)) {
       next[targetId] = [...values, insight.suggested_intake_value];

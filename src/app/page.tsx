@@ -3,13 +3,13 @@ import Link from "next/link";
 import { Logo } from "@/components/home/logo";
 import { Reveal } from "@/components/home/reveal";
 import { PublicHeader } from "@/components/home/public-header";
-import { PlatformShowcase } from "@/components/home/platform-showcase";
+import { ComplyShowcase } from "@/components/home/comply-showcase";
 import { ScrollToTop } from "@/components/home/scroll-to-top";
 
 export const metadata: Metadata = {
-  title: "KAPTRIX | Don't write a check on AI you can't defend",
+  title: "KaptrixComply | Evidence-backed vendor compliance, automated",
   description:
-    "Evidence-backed AI diligence for investors and operators. Score what's real, expose contradictions, produce decision-grade outputs before capital moves.",
+    "AI-assisted compliance questionnaires. Upload vendor evidence, auto-fill SOC 2, ISO 27001, NIST CSF and HIPAA controls, and export audit-ready reports with a cited passage behind every answer.",
 };
 
 // ---------------------------------------------------------------------------
@@ -18,119 +18,95 @@ export const metadata: Metadata = {
 // ---------------------------------------------------------------------------
 
 const HERO_PROOF = [
-  "Every score traced to a specific source passage.",
-  "Contradictions across decks, contracts, and code flagged automatically.",
-  "IC-ready outputs defensible at committee — and eighteen months later.",
+  "Every answer traced back to a cited passage in the vendor's evidence pack.",
+  "SOC 2, ISO 27001, NIST CSF, HIPAA, PCI DSS and custom templates — out of the box.",
+  "Rationale and confidence on every control, exportable to an audit-ready PDF.",
 ];
 
 const COST_OF_WRONG = [
-  "Overpay for a wrapper priced like a platform.",
-  "Undisclosed vendor and model dependencies surface post-close.",
-  "Narrative scored as capability; the cliff appears in quarter three.",
-  "A thesis you can't defend when LPs, the board, or the exit committee asks how the call got made.",
+  "Compliance officers spend weeks copying answers out of SOC 2 reports and policy PDFs.",
+  "Controls get approved without a citation — until an auditor asks where the evidence lived.",
+  "Every new framework resets the work; the same vendor evidence gets reviewed from scratch.",
+  "Third-party risk slips through when questionnaires get skimmed instead of scored.",
 ];
 
 const HOW_IT_WORKS = [
   {
     id: "01",
-    step: "Intake",
-    line: "Ingest the full room — CIMs, contracts, code artifacts, customer calls, model specs.",
+    step: "Ingest",
+    line: "Upload vendor policies, SOC 2 reports, DPAs, and questionnaire responses — parsed and indexed as the evidence pack.",
   },
   {
     id: "02",
-    step: "Scoring",
-    line: "Apply a fixed rubric to the dimensions that break AI companies — every score tied to evidence.",
+    step: "Extract",
+    line: "AI maps each control to the strongest supporting passage and returns a draft answer, rationale, and confidence score.",
   },
   {
     id: "03",
-    step: "Outputs",
-    line: "Ship an IC memo, risk register, and execution plan with a full audit trail from artifact to decision.",
-  },
-];
-
-const SNAPSHOTS = [
-  {
-    kicker: "Layer 01",
-    title: "Intake & context",
-    description: "Scope the deal. Lock the thesis. Set the questions that matter.",
-    href: "/demo/intake",
-    accent: "from-slate-700/40 via-slate-700/20 to-transparent",
-  },
-  {
-    kicker: "Layer 02",
-    title: "Scoring layer",
-    description: "Structured dimensions. Every claim traced to evidence.",
-    href: "/demo/scoring",
-    accent: "from-slate-700/40 via-slate-700/20 to-transparent",
-  },
-  {
-    kicker: "Layer 03",
-    title: "Report layer",
-    description: "Committee-ready outputs. Full audit trail from artifact to decision.",
-    href: "/demo/report",
-    accent: "from-slate-700/40 via-slate-700/20 to-transparent",
+    step: "Review & export",
+    line: "Your officer reviews each rationale, accepts or edits, then exports a decision-grade compliance report with full citations.",
   },
 ];
 
 const DELIVERABLES = [
   {
-    name: "AI Diligence Report",
-    what: "Ten-section master report: architecture, data, evals, team, moat, vendor risk, scaling, compliance, commercial posture.",
-    why: "The document the partner reads on the train. It has to survive scrutiny.",
+    name: "Answered Questionnaire",
+    what: "Complete framework response — every control filled with a draft answer, cited passage, and confidence score.",
+    why: "The work product that used to take weeks, drafted in minutes — ready for your officer to review, not transcribe.",
   },
   {
-    name: "Investment Committee Memo",
-    what: "Recommendation, thesis, key risks, mitigations, and decision rationale — condensed to IC format.",
-    why: "A clear call, not a summary. Dissent is grounded in the same facts.",
+    name: "AI Rationale Report",
+    what: "Per-control reasoning explaining why the AI answered the way it did, grounded in the vendor's own evidence.",
+    why: "Auditors don't ask for answers — they ask how you got there. This is that paper trail.",
   },
   {
-    name: "Technical Risk Register",
-    what: "Ranked register of technical, model, data, vendor, and operational risks with severity, triggers, and owners.",
-    why: "The handoff to the post-close team so nothing drops in the first 90 days.",
+    name: "Evidence Pack Index",
+    what: "Every uploaded document, indexed with the passages it supports and the controls it satisfies.",
+    why: "Instantly find the SOC 2 section or policy paragraph an answer depends on, without re-reading the report.",
   },
   {
-    name: "Competitive Posture",
-    what: "Where the company leads, where it's exposed, and what happens when the next model release lands.",
-    why: "Tells you whether the moat is real or a six-month lead dressed up as one.",
+    name: "Control Coverage Summary",
+    what: "Framework-level KPIs: auto-filled, partial, and missing — broken down by control category.",
+    why: "Know the moment an engagement is review-ready, and where the vendor still owes evidence.",
   },
   {
-    name: "Value Creation & Execution Plan",
-    what: "Sequenced 100-day plan: what to fix, scale, restructure, or kill — owner-tagged, tied to thesis levers.",
-    why: "The gap between a good thesis and a good return is execution. This is where that gap closes.",
+    name: "Audit-Ready PDF",
+    what: "Presentable, print-styled compliance report with cover page, rationale summary, and cited evidence for every answer.",
+    why: "The document you hand to the auditor, the board, or the customer — defensible on its own.",
   },
 ];
 
 const DIFFERENTIATION = [
-  "Evidence or nothing — no score exists without a source passage behind it.",
-  "Tuned to AI failure modes — data drift, eval gaps, prompt fragility, vendor lock, silent degradation.",
-  "Contradiction-native — the gap between deck, contract, and code is the product, not an afterthought.",
-  "Reproducible — the same rubric applied the same way across every deal in the pipeline.",
-  "Compounding — your private knowledge base gets sharper with every engagement you run through it.",
+  "Evidence-backed — no answer ships without a passage from the vendor's own documents cited behind it.",
+  "Framework-native — SOC 2, ISO 27001, NIST CSF, HIPAA, PCI DSS, and your internal questionnaires.",
+  "Auditor-defensible — rationale and confidence on every control, exportable to a print-ready PDF.",
+  "Officer-in-the-loop — AI drafts, your reviewer decides; no answer is final until it's accepted.",
+  "Private by design — vendor evidence stays in your workspace. Zero-retention LLM providers, no training on your data.",
 ];
 
 const EXECUTION_BULLETS = [
-  "Sequenced 100-day plan with owners, dependencies, and success criteria.",
-  "Architecture and data-layer remediation targeted at the fragility diligence surfaced.",
-  "Eval, observability, and model-governance scaffolding — instrumented before it breaks.",
-  "Vendor and model hardening: reduce lock-in, add fallbacks, renegotiate before leverage shifts.",
+  "Draft answers auto-populated with the strongest matching evidence snippet already cited.",
+  "Confidence scoring so reviewers instantly see which controls need a closer read.",
+  "Plain-English rationale per control — no prompt engineering, no black box.",
+  "One-click audit-ready PDF: cover page, KPI coverage, per-control rationale, evidence trail.",
 ];
 
 const MOAT_BULLETS = [
-  "Every artifact, adjustment, and rationale folds into your private index — nothing is discarded.",
-  "Patterns across architectures and failure modes carry from deal to deal.",
-  "Institutional memory survives team turnover and market cycles.",
-  "The tenth engagement is materially sharper — and harder to match — than the first.",
+  "Every reviewed engagement sharpens your index of what good evidence looks like for your frameworks.",
+  "Patterns across vendors, controls, and audit cycles carry from engagement to engagement.",
+  "Reusable templates and historical answers shrink the next questionnaire before it starts.",
+  "Your workspace never leaks — vendor evidence stays yours, and the LLM never trains on it.",
 ];
 
 const MARQUEE = [
   "Evidence-backed",
-  "Decision-grade",
-  "Contradiction-aware",
-  "Audit-trailed",
-  "Execution-ready",
-  "Compounds per deal",
-  "Vendor-risk mapped",
-  "IC-ready",
+  "Auditor-defensible",
+  "Framework-native",
+  "SOC 2 · ISO 27001 · NIST CSF",
+  "HIPAA · PCI DSS",
+  "Rationale-first",
+  "Officer-in-the-loop",
+  "Zero-retention LLM",
 ];
 
 const BTN_PRIMARY =
@@ -163,19 +139,20 @@ export default function HomePage() {
         <div className="relative mx-auto max-w-6xl px-6 pb-20 pt-28 sm:pt-32 lg:pb-28">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-300">
-              AI diligence, rebuilt for capital decisions
+              AI-assisted vendor compliance
             </p>
             <h1 className="mt-6 max-w-4xl text-5xl font-light leading-[1.05] tracking-tight sm:text-6xl lg:text-[5.25rem] kx-fade-in">
-              Don&apos;t write a check on
+              Vendor questionnaires,
               <br />
               <span className="bg-gradient-to-r from-white via-indigo-100 to-indigo-300 bg-clip-text text-transparent">
-                AI you can&apos;t defend.
+                answered with evidence.
               </span>
             </h1>
             <p className="mt-8 max-w-2xl text-lg leading-8 text-slate-100 sm:text-xl">
-              Kaptrix pressure-tests AI companies before capital moves —
-              scoring what&apos;s real, exposing what contradicts, and
-              producing the decision-grade package your IC can stand behind.
+              KaptrixComply ingests a vendor&apos;s policies and audit reports,
+              auto-fills SOC 2, ISO 27001, NIST CSF and HIPAA controls, and
+              cites the exact source passage behind every answer — so reviews
+              go from weeks of transcription to hours of sign-off.
             </p>
 
             <ul className="mt-8 space-y-2.5">
@@ -195,17 +172,10 @@ export default function HomePage() {
 
             <div className="mt-10 flex flex-wrap items-center gap-3">
               <Link href="/contact" className={BTN_PRIMARY_ON_DARK}>
-                Start a diligence engagement
+                Start a compliance engagement
               </Link>
-              <Link href="/sample-report" className={BTN_SECONDARY_ON_DARK}>
-                See a sample report
-              </Link>
-              <Link
-                href="/demo"
-                className="ml-1 inline-flex items-center gap-2 rounded-full border-2 border-indigo-400/60 bg-white/10 px-5 py-2.5 text-base font-semibold text-white backdrop-blur transition hover:border-white hover:bg-white/20"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="-ml-0.5"><polygon points="6 4 20 12 6 20 6 4" /></svg>
-                Try the demo
+              <Link href="/how-it-works" className={BTN_SECONDARY_ON_DARK}>
+                How it works
               </Link>
             </div>
           </Reveal>
@@ -244,11 +214,11 @@ export default function HomePage() {
           <Reveal>
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#6B5BFF]">
-                The cost of being wrong
+                The cost of manual review
               </p>
               <h2 className="mt-4 text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
-                The check clears fast.{" "}
-                <span className="text-slate-600">The bill comes later.</span>
+                Compliance moves slow.{" "}
+                <span className="text-slate-600">Auditors don&apos;t.</span>
               </h2>
             </div>
           </Reveal>
@@ -276,11 +246,11 @@ export default function HomePage() {
         <section>
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#6B5BFF]">
-              What Kaptrix does
+              What KaptrixComply does
             </p>
             <h2 className="mt-4 max-w-3xl text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
-              A decision system.{" "}
-              <span className="text-slate-600">Not a report generator.</span>
+              A review system.{" "}
+              <span className="text-slate-600">Not a template generator.</span>
             </h2>
           </Reveal>
 
@@ -288,23 +258,23 @@ export default function HomePage() {
             {[
               {
                 id: "01",
-                title: "Ingests the evidence",
-                body: "CIMs, contracts, code, customer calls, model specs — pulled in, parsed, and indexed as the source of truth for the engagement.",
+                title: "Ingests the evidence pack",
+                body: "SOC 2 reports, ISO certifications, policies, DPAs, and vendor-completed questionnaires — parsed and indexed as the source of truth.",
               },
               {
                 id: "02",
-                title: "Scores what's real",
-                body: "A fixed rubric applied to the dimensions that actually break AI companies. Every score tied back to a specific passage.",
+                title: "Auto-fills the questionnaire",
+                body: "Each control is matched to its strongest supporting passage; a draft answer, cited snippet, and confidence score are written back.",
               },
               {
                 id: "03",
-                title: "Exposes contradictions",
-                body: "Decks claim one thing; contracts and code say another. The gap is surfaced, not absorbed.",
+                title: "Explains every answer",
+                body: "Plain-English rationale for each control — reviewers see why the AI answered the way it did before they accept or edit it.",
               },
               {
                 id: "04",
-                title: "Ships decision-grade outputs",
-                body: "IC memo, risk register, execution plan — each one defensible on the way in and on the way out.",
+                title: "Exports an audit-ready report",
+                body: "One-click PDF with cover page, KPI coverage, per-control rationale, and cited evidence — defensible in front of an auditor.",
               },
             ].map((layer, idx) => (
               <Reveal key={layer.id} delay={idx * 90}>
@@ -335,8 +305,8 @@ export default function HomePage() {
               How it works
             </p>
             <h2 className="mt-4 max-w-3xl text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
-              Intake.{" "}
-              <span className="text-slate-600">Scoring. Outputs.</span>
+              Ingest.{" "}
+              <span className="text-slate-600">Extract. Review.</span>
             </h2>
           </Reveal>
 
@@ -358,9 +328,7 @@ export default function HomePage() {
             ))}
           </ol>
 
-          <div className="mt-14">
-            <PlatformShowcase steps={SNAPSHOTS} />
-          </div>
+          <ComplyShowcase />
         </section>
 
         {/* ================================================================
@@ -373,7 +341,7 @@ export default function HomePage() {
             </p>
             <h2 className="mt-4 max-w-3xl text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
               What lands on your desk.{" "}
-              <span className="text-slate-600">Sourced. Auditable. Usable.</span>
+              <span className="text-slate-600">Cited. Auditable. Exportable.</span>
             </h2>
           </Reveal>
 
@@ -425,11 +393,11 @@ export default function HomePage() {
             <div className="grid gap-12 lg:grid-cols-[1fr_1.2fr] lg:items-start">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#6B5BFF]">
-                  Why Kaptrix
+                  Why KaptrixComply
                 </p>
                 <h2 className="mt-4 text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
-                  Not another tool.{" "}
-                  <span className="text-slate-600">Not another consultant.</span>
+                  Not another GRC suite.{" "}
+                  <span className="text-slate-600">Not another chatbot.</span>
                 </h2>
               </div>
               <ul className="space-y-3">
@@ -456,11 +424,11 @@ export default function HomePage() {
         <section className="border-t border-[#E5E7EB] pt-24">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#6B5BFF]">
-              Execution layer
+              What reviewers get
             </p>
             <h2 className="mt-4 max-w-3xl text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
-              This doesn&apos;t die{" "}
-              <span className="text-slate-600">in a PDF.</span>
+              Drafted answers.{" "}
+              <span className="text-slate-600">Reviewed by you.</span>
             </h2>
           </Reveal>
 
@@ -492,18 +460,18 @@ export default function HomePage() {
           <Reveal>
             <div className="relative max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-300">
-                The moat
+                Private by design
               </p>
               <h2 className="mt-4 text-3xl font-normal leading-[1.1] tracking-tight sm:text-5xl">
-                Intelligence that{" "}
+                Your evidence.{" "}
                 <span className="bg-gradient-to-r from-white to-indigo-200 bg-clip-text text-transparent">
-                  compounds.
+                  Your workspace.
                 </span>
               </h2>
               <p className="mt-6 text-base leading-7 text-slate-100 sm:text-lg">
-                Your submissions train <em>your</em> private knowledge base —
-                fully isolated, never shared, never used to train models for
-                anyone else.
+                Vendor documents stay in your tenant — never shared across
+                customers, never used to train anyone else&apos;s model. We
+                route through zero-retention LLM providers by default.
               </p>
             </div>
           </Reveal>
@@ -533,19 +501,19 @@ export default function HomePage() {
           <Reveal>
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#6B5BFF]">
-                Before the wire goes out
+                Before the next audit cycle
               </p>
               <h2 className="mt-4 text-3xl font-normal leading-[1.15] tracking-tight text-[#0B0B1A] sm:text-5xl">
-                Don&apos;t write a check on{" "}
-                <span className="text-slate-600">AI you can&apos;t defend.</span>
+                Compliance with evidence.{" "}
+                <span className="text-slate-600">Not guesswork.</span>
               </h2>
               <p className="kx-sub mt-6">
-                You&apos;ll answer for this decision — at the next IC, at the
-                board, at the exit. Bring the evidence.
+                Stop copy-pasting out of vendor SOC 2 reports. Let your team
+                review rationale instead of transcribing control language.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href="/contact" className={BTN_PRIMARY}>
-                  Start a diligence engagement
+                  Start a compliance engagement
                 </Link>
                 <Link href="/sample-report" className={BTN_SECONDARY}>
                   See a sample report
@@ -563,16 +531,13 @@ export default function HomePage() {
         <div className="mx-auto max-w-6xl px-6 py-12 text-sm text-slate-600">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <Logo wordClassName="text-sm text-[#0B0B1A]" markClassName="h-5 w-5" />
-            <p>© {new Date().getFullYear()} Kaptrix</p>
+            <p>© {new Date().getFullYear()} KaptrixComply</p>
             <div className="flex items-center gap-6">
               <Link href="/how-it-works" className="transition hover:text-[#0B0B1A]">
                 How it works
               </Link>
               <Link href="/framework" className="transition hover:text-[#0B0B1A]">
-                Framework
-              </Link>
-              <Link href="/app" className="transition hover:text-[#0B0B1A]">
-                Platform
+                Frameworks
               </Link>
               <Link href="/contact" className="transition hover:text-[#0B0B1A]">
                 Contact
@@ -580,9 +545,9 @@ export default function HomePage() {
             </div>
           </div>
           <p className="mt-8 max-w-3xl text-xs leading-5 text-slate-500">
-            Kaptrix is an advisory and technology practice. Engagements are
-            governed by individual letters of engagement. Not investment
-            advice.
+            KaptrixComply is a vendor-compliance review platform. Outputs are
+            drafted by AI and reviewed by your compliance officer. Not legal
+            or audit advice.
           </p>
         </div>
       </footer>
