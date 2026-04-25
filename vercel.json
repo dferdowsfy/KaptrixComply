@@ -3,11 +3,11 @@
   "rewrites": [
     {
       "source": "/aideligence",
-      "destination": "https://kaptrix.vercel.app"
+      "destination": "https://kaptrix.vercel.app/aideligence"
     },
     {
       "source": "/aideligence/:path*",
-      "destination": "https://kaptrix.vercel.app/:path*"
+      "destination": "https://kaptrix.vercel.app/aideligence/:path*"
     }
   ]
 }
