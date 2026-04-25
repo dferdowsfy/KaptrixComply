@@ -18,17 +18,23 @@ const nextConfig: NextConfig = {
   //   /preview/* — legacy path, kept for backward compat
   // All three rewrite to the same src/app/preview/* route handlers.
   async rewrites() {
-    return [
-      { source: "/app", destination: "/preview" },
-      { source: "/app/:path*", destination: "/preview/:path*" },
-      { source: "/demo", destination: "/preview" },
-      { source: "/demo/:path*", destination: "/preview/:path*" },
-      // Proxy the AI Diligence product (separate Vercel project, kaptrix repo)
-      // so it lives under kaptrix.com/aideligence. Project B sets
-      // basePath: '/aideligence' so the prefix passes through unchanged.
-      { source: "/aideligence", destination: "https://kaptrix.vercel.app/aideligence" },
-      { source: "/aideligence/:path*", destination: "https://kaptrix.vercel.app/aideligence/:path*" },
-    ];
+    return {
+      // External rewrites must run before the filesystem check so they
+      // proxy at the edge instead of falling through to Next's app router.
+      // Project B (kaptrix repo) sets basePath: '/aideligence' so the
+      // prefix is preserved on both sides.
+      beforeFiles: [
+        { source: "/aideligence", destination: "https://kaptrix.vercel.app/aideligence" },
+        { source: "/aideligence/:path*", destination: "https://kaptrix.vercel.app/aideligence/:path*" },
+      ],
+      afterFiles: [
+        { source: "/app", destination: "/preview" },
+        { source: "/app/:path*", destination: "/preview/:path*" },
+        { source: "/demo", destination: "/preview" },
+        { source: "/demo/:path*", destination: "/preview/:path*" },
+      ],
+      fallback: [],
+    };
   },
 };
 
