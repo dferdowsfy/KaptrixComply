@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/aideligence",
+      "destination": "https://kaptrix.vercel.app"
+    },
+    {
+      "source": "/aideligence/:path*",
+      "destination": "https://kaptrix.vercel.app/:path*"
+    }
+  ]
+}
