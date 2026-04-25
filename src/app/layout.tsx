@@ -16,11 +16,11 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://kaptrix.com";
 
 export const metadata: Metadata = {
   title: {
-    default: "Kaptrix | AI Product Diligence for Private Equity",
-    template: "%s | Kaptrix",
+    default: "KaptrixComply | Evidence-backed vendor compliance, automated",
+    template: "%s | KaptrixComply",
   },
   description:
-    "Evidence-backed AI diligence for investors and operators. Expose fragile systems, score what's real, and produce decision-grade outputs before capital moves.",
+    "AI-assisted compliance questionnaires. Upload vendor evidence, auto-fill SOC 2, ISO 27001, NIST CSF and HIPAA controls, and export audit-ready reports with a cited passage behind every answer.",
   metadataBase: new URL(baseUrl),
   icons: {
     icon: [
@@ -32,17 +32,17 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "Kaptrix",
-    title: "Kaptrix | AI Product Diligence for Private Equity",
+    siteName: "KaptrixComply",
+    title: "KaptrixComply | Evidence-backed vendor compliance, automated",
     description:
-      "Evidence-backed AI diligence for investors and operators. Expose fragile systems, score what's real, and produce decision-grade outputs before capital moves.",
+      "AI-assisted compliance questionnaires. Upload vendor evidence, auto-fill SOC 2, ISO 27001, NIST CSF and HIPAA controls, and export audit-ready reports with a cited passage behind every answer.",
     url: baseUrl,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Kaptrix | AI Product Diligence for Private Equity",
+    title: "KaptrixComply | Evidence-backed vendor compliance, automated",
     description:
-      "Evidence-backed AI diligence for investors and operators. Expose fragile systems, score what's real, and produce decision-grade outputs before capital moves.",
+      "AI-assisted compliance questionnaires. Upload vendor evidence, auto-fill SOC 2, ISO 27001, NIST CSF and HIPAA controls, and export audit-ready reports with a cited passage behind every answer.",
   },
   robots: {
     index: true,
@@ -70,7 +70,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         {children}
       </body>
     </html>

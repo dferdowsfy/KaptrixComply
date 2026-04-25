@@ -15,8 +15,7 @@ import { useEffect, useState } from "react";
 
 const NAV_LINKS = [
   { href: "/how-it-works", label: "How it works" },
-  { href: "/framework", label: "Framework" },
-  { href: "/demo", label: "Platform" },
+  { href: "/framework", label: "Frameworks" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -86,13 +85,13 @@ export function PublicHeader() {
         style={menuOpen ? { backgroundColor: `${MENU_PURPLE}F2` } : undefined}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-6 py-5">
-          <Link href="/" aria-label="KAPTRIX home" className="group">
+          <Link href="/" aria-label="KaptrixComply home" className="group">
             <span
               className={`text-sm font-semibold uppercase tracking-[0.32em] transition-colors sm:text-base ${
                 scrolledGlass ? "text-slate-900" : "text-white"
               }`}
             >
-              Kaptrix
+              KaptrixComply
             </span>
           </Link>
 

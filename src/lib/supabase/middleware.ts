@@ -7,8 +7,6 @@ import {
 } from "@/lib/preview-access";
 
 // Routes that are publicly accessible without authentication.
-// The /preview workspace is the demo experience; /api/preview and /api/chat
-// back that workspace and must also be reachable anonymously.
 const PUBLIC_PATH_PREFIXES = [
   "/preview",
   "/demo",
@@ -21,8 +19,20 @@ const PUBLIC_PATH_PREFIXES = [
   "/api/chat",
 ];
 
+// Routes that belong to a specific role — used for cross-role blocking
+const OFFICER_PREFIXES = ["/officer"];
+const VENDOR_PREFIXES  = ["/vendor"];
+
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+function isOfficerPath(pathname: string): boolean {
+  return OFFICER_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
+function isVendorPath(pathname: string): boolean {
+  return VENDOR_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
 export async function updateSession(request: NextRequest) {
@@ -53,19 +63,14 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Refresh session cookie if present, but never redirect to login.
+  // Refresh session cookie
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Admin-enforced page hiding for SIGNED-IN users.
-  //
-  // `/app/*` is a rewrite to `/preview/*` (see next.config.ts). Without
-  // guarding BOTH prefixes, a signed-in user could bypass the hide by
-  // typing the underlying `/preview/...` URL directly. `/preview/*` also
-  // remains the anonymous demo surface, so we only enforce when a user
-  // session is present — anonymous visitors see the full demo.
   const path = request.nextUrl.pathname;
+
+  // ── Preview / demo tab hiding (signed-in users) ──────────────────────────
   const isProtectedSurface =
     path.startsWith("/app") || path.startsWith("/preview") || path.startsWith("/demo");
   if (user && isProtectedSurface) {
@@ -81,7 +86,11 @@ export async function updateSession(request: NextRequest) {
 
     if (isPreviewTabHidden(tabId, hiddenKeys)) {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = path.startsWith("/preview") ? "/preview" : path.startsWith("/demo") ? "/demo" : "/app";
+      redirectUrl.pathname = path.startsWith("/preview")
+        ? "/preview"
+        : path.startsWith("/demo")
+        ? "/demo"
+        : "/app";
       redirectUrl.search = "";
       const redirectResponse = NextResponse.redirect(redirectUrl);
       supabaseResponse.cookies.getAll().forEach(({ name, value }) => {
@@ -89,6 +98,52 @@ export async function updateSession(request: NextRequest) {
       });
       return redirectResponse;
     }
+  }
+
+  // ── Role-based routing for officer / vendor routes ────────────────────────
+  if (!isPublicPath(path) && (isOfficerPath(path) || isVendorPath(path))) {
+    // Not authenticated → redirect to login
+    if (!user) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("next", path);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // Fetch the user's role
+    const { data: roleRecord } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const role = roleRecord?.role as string | null | undefined;
+
+    // Block vendors from officer routes (redirect to their dashboard)
+    if (isOfficerPath(path) && role === "vendor") {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/vendor/dashboard";
+      redirectUrl.search = "";
+      const response = NextResponse.redirect(redirectUrl);
+      supabaseResponse.cookies.getAll().forEach(({ name, value }) => {
+        response.cookies.set(name, value);
+      });
+      return response;
+    }
+
+    // Block officers from vendor routes (redirect to their dashboard)
+    if (isVendorPath(path) && role === "compliance_officer") {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/officer/dashboard";
+      redirectUrl.search = "";
+      const response = NextResponse.redirect(redirectUrl);
+      supabaseResponse.cookies.getAll().forEach(({ name, value }) => {
+        response.cookies.set(name, value);
+      });
+      return response;
+    }
+
+    // Admins pass through to both sides
   }
 
   return supabaseResponse;

@@ -37,7 +37,9 @@ For each insight you find:
 - Write a concise one-sentence insight that adds analytical value beyond the raw quote.
 - Classify into exactly one category: commercial, technical, regulatory, financial, operational.
 - Assign confidence: high (explicit statement), medium (implied), low (inference/speculation).
-- If the insight maps to a known intake field (e.g. "revenue_arr", "customer_count", "team_size"), set suggested_intake_field and suggested_intake_value.
+- If the insight maps to a known intake field, set suggested_intake_field (use the exact snake_case key from the list below) and suggested_intake_value.
+  Valid intake field keys: engagement_type, buyer_archetype, buyer_industry, target_size_usd, decision_horizon_days, deal_thesis, deal_stage, diligence_priorities, internal_sponsor_role, dissenting_voices, approval_path, investment_size_usd, annual_run_rate_usd, cost_sensitivity, payback_expectation_months, gross_margin_hurdle, primary_kpi, measurable_targets, kill_criteria, alternatives_considered, alternatives_detail, switching_cost_from_incumbent, lock_in_tolerance, in_house_ml_talent, data_readiness, change_management_risk, existing_ai_systems, ai_maturity_perception, primary_architecture, known_vendors, regulatory_exposure, customer_geographies, training_data_sources, customer_data_usage_rights, ip_indemnification_needed, business_continuity_requirement, data_exit_plan, multi_region_requirement, red_flag_priors, client_risk_appetite, artifacts_received, gaps_already_known, diligence_team_composition, context_notes.
+  Only use a key from this list. Omit the field entirely if no key fits.
 - You may also receive intake context from Supabase. Use it only to prioritize what matters and to map suggested intake fields; it is NOT evidence.
 
 Rules:
@@ -96,8 +98,8 @@ async function callLlm(
         { role: "user", content: userMessage },
       ],
       temperature: 0.1,
-      maxTokens: 1200,
-      model: getSelfHostedLlmModelForTask("report"),
+      maxTokens: 2000,
+      model: getSelfHostedLlmModelForTask("extract"),
       jsonMode: true,
       timeoutMs: 60_000,
     });
@@ -111,7 +113,7 @@ async function callLlm(
         { role: "user", content: userMessage },
       ],
       temperature: 0.1,
-      maxTokens: 1200,
+      maxTokens: 2000,
       jsonMode: true,
       timeoutMs: 60_000,
     });

@@ -10,6 +10,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [workspaceHref, setWorkspaceHref] = useState<string>("/officer/dashboard");
 
   // Profile fields
   const [fullName, setFullName] = useState("");
@@ -26,17 +27,33 @@ export default function SettingsPage() {
       setLoading(false);
       return;
     }
+    const supabase = createClient();
     // Load current user profile
     Promise.all([
-      createClient().auth.getUser(),
+      supabase.auth.getUser(),
       fetch("/api/user/profile", { cache: "no-store" }).then((r) =>
         r.ok ? r.json() : null,
       ),
-    ]).then(([{ data }, profile]) => {
+    ]).then(async ([{ data }, profile]) => {
       setEmail(data.user?.email ?? null);
       if (profile) {
         setFullName(profile.full_name ?? "");
         setFirmName(profile.firm_name ?? "");
+      }
+      // Resolve KaptrixComply workspace based on user_roles
+      if (data.user?.id) {
+        const { data: roleRow } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user.id)
+          .maybeSingle();
+        const role = (roleRow?.role as string | undefined)
+          ?? (data.user.user_metadata?.role as string | undefined);
+        if (role === "vendor") {
+          setWorkspaceHref("/vendor/dashboard");
+        } else if (role === "compliance_officer") {
+          setWorkspaceHref("/officer/dashboard");
+        }
       }
       setLoading(false);
     });
@@ -105,7 +122,7 @@ export default function SettingsPage() {
             <h1 className="mt-1 text-2xl font-bold sm:text-3xl">Settings</h1>
           </div>
           <Link
-            href="/app"
+            href={workspaceHref}
             className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400"
           >
             Back to workspace
