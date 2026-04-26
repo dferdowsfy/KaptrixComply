@@ -4,6 +4,10 @@ import { UPLOAD_LIMITS } from "@/lib/constants";
 import { validateUpload } from "@/lib/security/upload-validator";
 import { requireAuth, authErrorResponse } from "@/lib/security/authz";
 import { getServiceClient } from "@/lib/supabase/service";
+import {
+  classifyDocument,
+  type ClassificationResult,
+} from "@/lib/preview/classify-document";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -76,6 +80,40 @@ export async function POST(request: NextRequest) {
       validation.effectiveMime!,
     );
 
+    // Auto-classify when the caller didn't pin a specific category. The
+    // per-row Upload buttons in the coverage matrix supply the artifact's
+    // real category; the generic drop-zone defaults to "other" and the
+    // "custom_*" prefix is reserved for user-defined slots — both should
+    // be reclassified using filename + parsed content so the scoring
+    // engine gets evidence under the right sub-criteria.
+    const shouldClassify =
+      !category ||
+      category === "other" ||
+      category.startsWith("custom_");
+
+    let classification: ClassificationResult = {
+      category,
+      classified_by: "user",
+      confidence: "high",
+      reason: "user-supplied category",
+    };
+    if (shouldClassify && text.trim().length > 0) {
+      try {
+        classification = await classifyDocument({
+          filename: file.name,
+          parsedText: text,
+          fallbackCategory: category,
+        });
+      } catch (err) {
+        // Never fail the upload because classification failed.
+        console.warn(
+          "[preview/parse] auto-classify failed, keeping caller-supplied category",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+    const finalCategory = classification.category;
+
     // Persistence outcome flags so the client can surface diagnostics
     // when an upload reaches "✓ Ready" but the row never lands in
     // preview_uploaded_docs (and therefore never reaches scoring).
@@ -104,7 +142,7 @@ export async function POST(request: NextRequest) {
               id: docId,
               client_id: clientId,
               filename: file.name,
-              category,
+              category: finalCategory,
               mime_type: validation.effectiveMime,
               file_size_bytes: buffer.byteLength,
               parsed_text: text,
@@ -134,6 +172,13 @@ export async function POST(request: NextRequest) {
       filename: file.name,
       size: buffer.byteLength,
       persisted,
+      // Auto-classification result so the client can update its
+      // localStorage record (so the coverage matrix routes the file to
+      // the right artifact row without a reload).
+      category: finalCategory,
+      classified_by: classification.classified_by,
+      classification_confidence: classification.confidence,
+      classification_reason: classification.reason,
       ...(persistSkippedReason ? { persist_skipped_reason: persistSkippedReason } : {}),
       ...(persistError ? { persist_error: persistError } : {}),
     });
