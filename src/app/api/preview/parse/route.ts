@@ -76,9 +76,27 @@ export async function POST(request: NextRequest) {
       validation.effectiveMime!,
     );
 
-    if (clientId && docId && text.trim()) {
+    // Persistence outcome flags so the client can surface diagnostics
+    // when an upload reaches "✓ Ready" but the row never lands in
+    // preview_uploaded_docs (and therefore never reaches scoring).
+    let persisted = false;
+    let persistSkippedReason: string | null = null;
+    let persistError: string | null = null;
+
+    if (!clientId || !docId) {
+      persistSkippedReason = "missing_client_or_doc_id";
+    } else if (!text.trim()) {
+      // Image-only / scanned PDFs commonly parse to empty text. Without
+      // this signal the row would silently be dropped.
+      persistSkippedReason = "empty_parsed_text";
+    } else {
       const supabase = getServiceClient();
-      if (supabase) {
+      if (!supabase) {
+        persistSkippedReason = "service_client_unavailable";
+        console.warn(
+          "[preview/parse] KB persist skipped — getServiceClient() returned null (check NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).",
+        );
+      } else {
         const { error: upsertError } = await supabase
           .from("preview_uploaded_docs")
           .upsert(
@@ -98,10 +116,13 @@ export async function POST(request: NextRequest) {
             { onConflict: "id" },
           );
         if (upsertError) {
+          persistError = upsertError.message;
           console.warn(
             "[preview/parse] KB persist failed",
             upsertError.message,
           );
+        } else {
+          persisted = true;
         }
       }
     }
@@ -112,7 +133,9 @@ export async function POST(request: NextRequest) {
       mime: validation.effectiveMime,
       filename: file.name,
       size: buffer.byteLength,
-      persisted: Boolean(clientId && docId),
+      persisted,
+      ...(persistSkippedReason ? { persist_skipped_reason: persistSkippedReason } : {}),
+      ...(persistError ? { persist_error: persistError } : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

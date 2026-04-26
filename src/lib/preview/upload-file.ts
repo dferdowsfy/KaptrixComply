@@ -60,7 +60,14 @@ export function uploadAndParse(file: File, meta: UploadedDoc): Promise<void> {
       try {
         const status = xhr.status;
         const body = xhr.responseText;
-        let parsed: { text?: string; tokenCount?: number; error?: string } = {};
+        let parsed: {
+          text?: string;
+          tokenCount?: number;
+          error?: string;
+          persisted?: boolean;
+          persist_skipped_reason?: string;
+          persist_error?: string;
+        } = {};
         try {
           parsed = JSON.parse(body);
         } catch {
@@ -88,6 +95,17 @@ export function uploadAndParse(file: File, meta: UploadedDoc): Promise<void> {
         // than flipping to ✓ instantly.
         const parsedText = (parsed.text ?? "").trim();
         const hasClient = Boolean(meta.client_id && parsedText);
+
+        // Surface persistence failures: the file's text is in localStorage
+        // and will reach chat / deterministic engine, but if persisted is
+        // false the LLM scoring path (which reads preview_uploaded_docs
+        // server-side) won't see it. Worth a console warning so the user
+        // can diagnose without spelunking server logs.
+        if (parsed.persisted === false) {
+          console.warn(
+            `[upload] "${meta.filename}" parsed but NOT persisted to preview_uploaded_docs (reason: ${parsed.persist_skipped_reason ?? parsed.persist_error ?? "unknown"}). LLM scoring will not see this file.`,
+          );
+        }
 
         upsertUploadedDoc({
           ...meta,
